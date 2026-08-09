@@ -1,0 +1,218 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// ------------------------------------------------------
+// MULTI-TENANT ARCHITECTURE
+// ------------------------------------------------------
+
+/// Represents an Insurance Agency/Company using the SaaS.
+model Company {
+  id        String   @id @default(uuid())
+  name      String   // e.g. "Ahmet Sigorta"
+  domain    String?  @unique // e.g. "ahmetsigorta.com"
+  theme     String?  // e.g. "red", "blue" for white-labeling
+  logoUrl   String?
+  
+  // Profile Information
+  ownerName String?
+  iban      String?
+  bankName  String?
+  address   String?
+  phone     String?
+  email     String?
+  monthlyTarget Float? @default(100000)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relationships
+  users      User[]
+  leads      Lead[]
+  messages   Message[]
+  clients    Client[]
+  policies   Policy[]
+  financials Financial[]
+  invoices   Invoice[]
+}
+
+/// Represents an employee or admin of a Company.
+model User {
+  id        String   @id @default(uuid()) // Should map to Supabase Auth User ID
+  email     String   @unique
+  fullName  String?
+  role      Role     @default(STAFF)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Multi-Tenant Link
+  companyId String
+  company   Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+}
+
+enum Role {
+  ADMIN
+  STAFF
+}
+
+/// Represents a customer/lead who submitted a quote request.
+model Lead {
+  id             String   @id @default(uuid())
+  insuranceType  String   // e.g. "arac", "konut"
+  fullName       String
+  tcKimlikNo     String?
+  phoneNumber    String
+  dateOfBirth    String?  // ISO date string
+  email          String?
+  city           String?
+  address        String?
+  licensePlate   String?
+  belgeNo        String?
+  brand          String?
+  model          String?
+  year           Int?
+  engineNo       String?
+  chassisNo      String?
+  status         String   @default("yeni") // "yeni", "iletildi", "onaylandi"
+  premium        Float?   // Poliçe tutarı / Teklif tutarı
+  commission     Float?   // Acente komisyonu / Beklenen komisyon
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  // Multi-Tenant Link
+  companyId String
+  company   Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  // Link to converted Client (Optional)
+  clientId  String?
+  client    Client?  @relation(fields: [clientId], references: [id], onDelete: SetNull)
+}
+
+/// Represents a contact form submission / support message
+model Message {
+  id        String   @id @default(uuid())
+  fullName  String
+  email     String
+  message   String
+  status    String   @default("yeni") // "yeni", "okundu", "silindi"
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Multi-Tenant Link
+  companyId String
+  company   Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+}
+
+/// Represents an actual Customer (Converted from Lead or manually added)
+model Client {
+  id        String   @id @default(uuid())
+  name      String
+  tc        String?
+  phone     String
+  email     String?
+  city      String?
+  address   String?
+  
+  // Base Vehicle details (for quick reference, if applicable)
+  plate     String?
+  brand     String?
+  model     String?
+  year      Int?
+  engineNo  String?
+  chassisNo String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Multi-Tenant Link
+  companyId String
+  company   Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  // Relations
+  leads      Lead[]
+  policies   Policy[]
+  financials Financial[]
+  invoices   Invoice[]
+}
+
+/// Represents a Policy sold to a Client
+model Policy {
+  id          String   @id @default(uuid())
+  type        String   // "Trafik", "Kasko", "DASK", etc.
+  companyName String?  // Insurance provider (e.g. "Anadolu Sigorta")
+  policyNo    String?
+  premium     Float
+  commission  Float?
+  startDate   DateTime
+  endDate     DateTime
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  clientId    String
+  client      Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  companyId   String
+  company     Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+}
+
+/// Represents a Financial Transaction (Income/Expense/Commission)
+model Financial {
+  id          String   @id @default(uuid())
+  kind        String   // "tahsilat", "komisyon", "gider"
+  amount      Float
+  description String
+  date        DateTime
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  clientId    String?
+  client      Client?  @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  companyId   String
+  company     Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+}
+
+/// Represents an Invoice generated for a Client
+model Invoice {
+  id          String   @id @default(uuid())
+  invoiceNo   String
+  date        DateTime
+  taxRate     Float    @default(0) // 0, 10, 20
+  subtotal    Float
+  taxAmount   Float
+  total       Float
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  clientId    String
+  client      Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  companyId   String
+  company     Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  
+  items       InvoiceItem[]
+}
+
+/// Represents an individual item in an Invoice
+model InvoiceItem {
+  id          String   @id @default(uuid())
+  description String
+  quantity    Int
+  price       Float
+
+  invoiceId   String
+  invoice     Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+}
+
