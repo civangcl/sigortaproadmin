@@ -45,9 +45,14 @@ app.use((err, _req, res, _next) => {
   });
 });
 
-// ── Start ─────────────────────────────────────────────────────────
-app.listen(PORT, () => {
-  console.log(`\n🚀 Ece Sigorta backend running on http://localhost:${PORT}`);
-  console.log(`   GET  http://localhost:${PORT}/api/status`);
-  console.log(`   POST http://localhost:${PORT}/api/offers\n`);
-});
+// Sadece yerel geliştirmede sunucuyu başlat (Vercel Serverless Function için export gerekiyor)
+if (process.env.NODE_ENV !== 'production') {
+  app.listen(PORT, () => {
+    console.log(`\n🚀 Ece Sigorta backend running on http://localhost:${PORT}`);
+    console.log(`   GET  http://localhost:${PORT}/api/status`);
+    console.log(`   POST http://localhost:${PORT}/api/offers\n`);
+  });
+}
+
+// Vercel Serverless Function için export
+module.exports = app;
