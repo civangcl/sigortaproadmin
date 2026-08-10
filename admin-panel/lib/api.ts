@@ -17,7 +17,16 @@ export async function fetchApi(endpoint: string, options: RequestInit = {}) {
   }
 
   let baseUrl = API_URL
-  if (baseUrl.endsWith('/')) baseUrl = baseUrl.slice(0, -1)
+  
+  // Clean up trailing slashes
+  while (baseUrl.endsWith('/')) {
+    baseUrl = baseUrl.slice(0, -1)
+  }
+
+  // Auto-append /api if missing (and not localhost)
+  if (!baseUrl.endsWith('/api') && !baseUrl.includes('localhost')) {
+    baseUrl = `${baseUrl}/api`
+  }
   
   const formattedEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`
   const fullUrl = `${baseUrl}${formattedEndpoint}`
