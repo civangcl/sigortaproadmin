@@ -1,6 +1,10 @@
-const jwt = require('jsonwebtoken');
+const { createClient } = require('@supabase/supabase-js');
 const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
+
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://dkxuuztfgjtljjmdfdxn.supabase.co';
+const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRreHV1enRmZ2p0bGpqbWRmZHhuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYxMzE4OTYsImV4cCI6MjEwMTcwNzg5Nn0.ii6iqiS7o2cAOh_FnNQpb8rqJa8X8SIxEGSawu7AuWg';
+const supabase = createClient(supabaseUrl, supabaseKey);
 
 async function authenticateUser(req, res, next) {
   const authHeader = req.headers['authorization'];
@@ -10,11 +14,14 @@ async function authenticateUser(req, res, next) {
 
   const token = authHeader.split(' ')[1];
   try {
-    const decoded = jwt.verify(token, process.env.SUPABASE_JWT_SECRET);
+    // Supabase sunucularına sorarak token'ı doğruluyoruz (JWT Secret'a ihtiyaç kalmıyor!)
+    const { data: { user }, error } = await supabase.auth.getUser(token);
     
-    // JWT signature is valid. Now look up the actual user in Prisma to get their role and companyId.
-    const userId = decoded.sub;
-    
+    if (error || !user) {
+      return res.status(401).json({ success: false, error: 'Unauthorized: Invalid token from Supabase' });
+    }
+
+    const userId = user.id;
     const dbUser = await prisma.user.findUnique({ where: { id: userId } });
     
     if (!dbUser) {
@@ -29,7 +36,7 @@ async function authenticateUser(req, res, next) {
     };
     next();
   } catch (error) {
-    return res.status(401).json({ success: false, error: 'Unauthorized: Invalid token' });
+    return res.status(401).json({ success: false, error: 'Unauthorized: Internal auth error' });
   }
 }
 
