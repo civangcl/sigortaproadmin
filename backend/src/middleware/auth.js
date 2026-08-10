@@ -1,6 +1,8 @@
 const jwt = require('jsonwebtoken');
+const { PrismaClient } = require('@prisma/client');
+const prisma = new PrismaClient();
 
-function authenticateUser(req, res, next) {
+async function authenticateUser(req, res, next) {
   const authHeader = req.headers['authorization'];
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
     return res.status(401).json({ success: false, error: 'Unauthorized: No token provided' });
@@ -10,12 +12,20 @@ function authenticateUser(req, res, next) {
   try {
     const decoded = jwt.verify(token, process.env.SUPABASE_JWT_SECRET);
     
-    // Supabase JWT payload contains standard fields like sub (userId), role, email
+    // JWT signature is valid. Now look up the actual user in Prisma to get their role and companyId.
+    const userId = decoded.sub;
+    
+    const dbUser = await prisma.user.findUnique({ where: { id: userId } });
+    
+    if (!dbUser) {
+      return res.status(401).json({ success: false, error: 'Unauthorized: User not found in database' });
+    }
+
     req.user = {
-      id: decoded.sub,
-      email: decoded.email,
-      role: decoded.user_metadata?.role || 'STAFF',
-      companyId: decoded.user_metadata?.companyId
+      id: dbUser.id,
+      email: dbUser.email,
+      role: dbUser.role,
+      companyId: dbUser.companyId
     };
     next();
   } catch (error) {
