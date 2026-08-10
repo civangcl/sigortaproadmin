@@ -15,7 +15,7 @@ router.post('/system/companies', authenticateUser, requireRole(['SUPERADMIN']), 
     const company = await prisma.company.create({
       data: {
         name,
-        domain,
+        domain: domain || null,
         ownerName,
         email,
       }
@@ -41,9 +41,57 @@ router.post('/system/companies', authenticateUser, requireRole(['SUPERADMIN']), 
 router.get('/system/companies', authenticateUser, requireRole(['SUPERADMIN']), async (req, res) => {
   try {
     const companies = await prisma.company.findMany({
-      orderBy: { createdAt: 'desc' }
+      orderBy: { createdAt: 'desc' },
+      include: {
+        _count: {
+          select: { clients: true, leads: true, policies: true }
+        },
+        financials: {
+          where: { kind: 'tahsilat' },
+          select: { amount: true }
+        }
+      }
     });
-    res.json(companies);
+
+    const mapped = companies.map(c => ({
+      ...c,
+      totalRevenue: c.financials.reduce((sum, f) => sum + f.amount, 0),
+      financials: undefined // remove raw financials from response
+    }));
+
+    res.json(mapped);
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+router.get('/system/companies/:id/details', authenticateUser, requireRole(['SUPERADMIN']), async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    // Fetch all related data for this company
+    const [company, clients, leads, financials] = await Promise.all([
+      prisma.company.findUnique({ where: { id } }),
+      prisma.client.findMany({
+        where: { companyId: id },
+        orderBy: { createdAt: 'desc' },
+        include: { policies: true, financials: true, leads: true }
+      }),
+      prisma.lead.findMany({
+        where: { companyId: id },
+        orderBy: { createdAt: 'desc' },
+        include: { company: true }
+      }),
+      prisma.financial.findMany({
+        where: { companyId: id },
+        orderBy: { date: 'desc' },
+        include: { client: true }
+      })
+    ]);
+
+    if (!company) return res.status(404).json({ success: false, error: 'Company not found' });
+
+    res.json({ success: true, company, clients, leads, financials });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
   }
