@@ -65,6 +65,24 @@ export function AdminApp() {
   const [financials, setFinancials] = React.useState<any[]>([])
 
   React.useEffect(() => {
+    // Check session on mount
+    import('@/lib/supabase/client').then(({ createClient }) => {
+      const supabase = createClient()
+      supabase.auth.getSession().then(({ data: { session } }) => {
+        if (session) {
+          setAuthed(true)
+        }
+      })
+
+      const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+        setAuthed(!!session)
+      })
+
+      return () => subscription.unsubscribe()
+    })
+  }, [])
+
+  React.useEffect(() => {
     if (!authed) return
     let mounted = true
     setLeadsLoading(true)
@@ -268,7 +286,10 @@ export function AdminApp() {
         leads={leads}
         mobileOpen={mobileNavOpen}
         onMobileOpenChange={setMobileNavOpen}
-        onLogout={() => {
+        onLogout={async () => {
+          const { createClient } = await import('@/lib/supabase/client')
+          const supabase = createClient()
+          await supabase.auth.signOut()
           setAuthed(false)
           setView("dashboard")
         }}

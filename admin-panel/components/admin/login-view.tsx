@@ -7,18 +7,32 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
 
+import { createClient } from '@/lib/supabase/client'
+import { toast } from 'sonner'
+
 export function LoginView({ onLogin }: { onLogin: () => void }) {
-  const [email, setEmail] = React.useState("firat.ece@sigortapanel.com")
-  const [password, setPassword] = React.useState("••••••••")
+  const [email, setEmail] = React.useState("")
+  const [password, setPassword] = React.useState("")
   const [loading, setLoading] = React.useState(false)
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setLoading(true)
-    setTimeout(() => {
-      setLoading(false)
+    
+    const supabase = createClient()
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email,
+      password
+    })
+    
+    setLoading(false)
+    
+    if (error) {
+      toast.error("Giriş Başarısız", { description: error.message })
+    } else {
+      toast.success("Giriş Başarılı", { description: "Sisteme yönlendiriliyorsunuz..." })
       onLogin()
-    }, 700)
+    }
   }
 
   return (
