@@ -19,9 +19,9 @@ app.use(
     // Allow all frontend apps: public site (3000/5173) and admin panel (5174)
     origin: process.env.FRONTEND_ORIGIN
       ? process.env.FRONTEND_ORIGIN.split(',').map((o) => o.trim())
-      : ['http://localhost:3000', 'http://localhost:5173', 'http://localhost:5174'],
-    methods: ['GET', 'POST', 'PATCH', 'OPTIONS'],
-    allowedHeaders: ['Content-Type'],
+      : ['http://localhost:3000', 'http://localhost:5173', 'http://localhost:5174', 'https://sigortaproadmin-front.vercel.app'],
+    methods: ['GET', 'POST', 'PATCH', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
   })
 );
 app.use(express.json());

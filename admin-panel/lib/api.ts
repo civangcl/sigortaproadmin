@@ -16,7 +16,13 @@ export async function fetchApi(endpoint: string, options: RequestInit = {}) {
     headers.set('Content-Type', 'application/json')
   }
 
-  const res = await fetch(`${API_URL}${endpoint}`, {
+  let baseUrl = API_URL
+  if (baseUrl.endsWith('/')) baseUrl = baseUrl.slice(0, -1)
+  
+  const formattedEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`
+  const fullUrl = `${baseUrl}${formattedEndpoint}`
+
+  const res = await fetch(fullUrl, {
     ...options,
     headers,
   })
