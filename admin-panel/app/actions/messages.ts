@@ -3,7 +3,8 @@ import { fetchApi } from '@/lib/api'
 export async function getMessages(token: string) {
   const res = await fetchApi('/messages', { cache: 'no-store' })
   if (!res.ok) return []
-  return res.json()
+  const data = await res.json()
+  return Array.isArray(data) ? data : (data.items ?? [])
 }
 
 export async function updateMessageStatus(id: string, status: 'okundu' | 'yeni') {

@@ -60,7 +60,7 @@ export function SystemAdminApp() {
       const res = await fetchApi('/system/companies')
       if (res.ok) {
         const data = await res.json()
-        setCompanies(data)
+        setCompanies(Array.isArray(data) ? data : (data.items ?? []))
       } else {
         toast.error("Şirketler yüklenemedi. Yetkiniz olmayabilir.")
       }

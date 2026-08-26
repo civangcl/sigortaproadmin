@@ -17,7 +17,8 @@ export async function updateCompanyProfile(data: any) {
 export async function getLeads() {
   const res = await fetchApi('/leads', { cache: 'no-store' })
   if (!res.ok) return []
-  return res.json()
+  const data = await res.json()
+  return Array.isArray(data) ? data : (data.items ?? [])
 }
 
 export async function addManualClient(data: any) {

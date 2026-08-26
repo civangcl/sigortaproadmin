@@ -3,7 +3,8 @@ import { fetchApi } from '@/lib/api'
 export async function getClients() {
   const res = await fetchApi('/clients', { cache: 'no-store' })
   if (!res.ok) return []
-  return res.json()
+  const data = await res.json()
+  return Array.isArray(data) ? data : (data.items ?? [])
 }
 
 export async function createClient(data: any) {
@@ -40,7 +41,8 @@ export async function deletePolicy(id: string) {
 export async function getFinancials() {
   const res = await fetchApi('/financials', { cache: 'no-store' })
   if (!res.ok) return []
-  return res.json()
+  const data = await res.json()
+  return Array.isArray(data) ? data : (data.items ?? [])
 }
 
 export async function createExpense(data: { amount: number, description: string, date: string }) {

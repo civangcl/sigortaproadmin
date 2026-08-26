@@ -37,6 +37,8 @@ model Company {
 
   // Relationships
   users      User[]
+  branches   Branch[]
+  memberships CompanyMembership[]
   leads      Lead[]
   messages   Message[]
   clients    Client[]
@@ -54,15 +56,78 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  // Multi-Tenant Link
+  // Multi-Tenant Link (DEPRECATED: Will be removed in Phase B)
   companyId String
   company   Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  
+  // New Membership Link
+  memberships CompanyMembership[]
 }
 
 enum Role {
   SUPERADMIN
   ADMIN
   STAFF
+}
+
+// ------------------------------------------------------
+// ORGANIZATION STRUCTURE
+// ------------------------------------------------------
+
+model Branch {
+  id        String   @id @default(uuid())
+  companyId String
+  company   Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  name      String
+  code      String?
+  isDefault Boolean  @default(false)
+  isActive  Boolean  @default(true)
+  phone     String?
+  email     String?
+  address   String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  memberships MembershipBranchAccess[]
+  clients     Client[]
+  policies    Policy[]
+  leads       Lead[]
+  financials  Financial[]
+  messages    Message[]
+
+  @@index([companyId])
+}
+
+model CompanyMembership {
+  id          String   @id @default(uuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  companyId   String
+  company     Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  role        String   @default("STAFF") // e.g. OWNER, ADMIN, MANAGER, SALES, ACCOUNTING, STAFF, VIEWER
+  status      String   @default("ACTIVE") // ACTIVE, SUSPENDED
+  allBranches Boolean  @default(false)
+  
+  branchAccess MembershipBranchAccess[]
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([userId, companyId])
+  @@index([companyId, role])
+  @@index([companyId, status])
+}
+
+model MembershipBranchAccess {
+  id           String @id @default(uuid())
+  membershipId String
+  branchId     String
+  
+  membership   CompanyMembership @relation(fields: [membershipId], references: [id], onDelete: Cascade)
+  branch       Branch            @relation(fields: [branchId], references: [id], onDelete: Cascade)
+
+  @@unique([membershipId, branchId])
+  @@index([branchId])
 }
 
 /// Represents a customer/lead who submitted a quote request.
@@ -93,9 +158,16 @@ model Lead {
   companyId String
   company   Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
 
+  // Branch Link
+  branchId  String?
+  branch    Branch?  @relation(fields: [branchId], references: [id], onDelete: SetNull)
+
   // Link to converted Client (Optional)
   clientId  String?
   client    Client?  @relation(fields: [clientId], references: [id], onDelete: SetNull)
+
+  @@index([companyId, status])
+  @@index([companyId, createdAt])
 }
 
 /// Represents a contact form submission / support message
@@ -111,6 +183,12 @@ model Message {
   // Multi-Tenant Link
   companyId String
   company   Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  // Branch Link
+  branchId  String?
+  branch    Branch?  @relation(fields: [branchId], references: [id], onDelete: SetNull)
+
+  @@index([companyId, status])
 }
 
 /// Represents an actual Customer (Converted from Lead or manually added)
@@ -138,11 +216,17 @@ model Client {
   companyId String
   company   Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
 
+  // Branch Link
+  branchId  String?
+  branch    Branch?  @relation(fields: [branchId], references: [id], onDelete: SetNull)
+
   // Relations
   leads      Lead[]
   policies   Policy[]
   financials Financial[]
   invoices   Invoice[]
+
+  @@index([companyId, createdAt])
 }
 
 /// Represents a Policy sold to a Client
@@ -164,6 +248,10 @@ model Policy {
   client      Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
   companyId   String
   company     Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  branchId    String?
+  branch      Branch?  @relation(fields: [branchId], references: [id], onDelete: SetNull)
+
+  @@index([companyId, endDate])
 }
 
 /// Represents a Financial Transaction (Income/Expense/Commission)
@@ -182,6 +270,10 @@ model Financial {
   client      Client?  @relation(fields: [clientId], references: [id], onDelete: Cascade)
   companyId   String
   company     Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  branchId    String?
+  branch      Branch?  @relation(fields: [branchId], references: [id], onDelete: SetNull)
+
+  @@index([companyId, kind, date])
 }
 
 /// Represents an Invoice generated for a Client

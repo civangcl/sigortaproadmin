@@ -3,3 +3,7 @@ dist/
 .env
 *.log
 prisma/migrations/
+.vercel
+.env*
+run-e2e.js
+test-*.js

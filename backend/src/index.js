@@ -8,7 +8,8 @@ require('dotenv').config();
 const express = require('express');
 const cors    = require('cors');
 
-const apiRouter = require('./routes/api');
+const apiRouter = require('./routes/index');
+const { errorHandler } = require('./middleware/error-handler');
 
 const app  = express();
 const PORT = process.env.PORT || 3001;
@@ -19,9 +20,9 @@ app.use(
     // Allow all frontend apps: public site (3000/5173) and admin panel (5174)
     origin: process.env.FRONTEND_ORIGIN
       ? process.env.FRONTEND_ORIGIN.split(',').map((o) => o.trim())
-      : ['http://localhost:3000', 'http://localhost:5173', 'http://localhost:5174', 'https://sigortaproadmin-front.vercel.app'],
+      : ['http://localhost:3000', 'http://localhost:5173', 'http://localhost:5174', 'https://sigortaproadmin-front.vercel.app', 'https://sigortapro-admin.vercel.app', 'https://website-six-mu-54.vercel.app', 'https://ecesigorta.com', 'https://www.ecesigorta.com'],
     methods: ['GET', 'POST', 'PATCH', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'x-company-id'],
   })
 );
 app.use(express.json());
@@ -35,15 +36,7 @@ app.use((_req, res) => {
 });
 
 // ── Global error handler ──────────────────────────────────────────
-// eslint-disable-next-line no-unused-vars
-app.use((err, _req, res, _next) => {
-  console.error('[ERROR]', err);
-  res.status(500).json({
-    success: false,
-    message: 'Internal server error.',
-    ...(process.env.NODE_ENV !== 'production' && { error: err.message }),
-  });
-});
+app.use(errorHandler);
 
 // Sadece yerel geliştirmede sunucuyu başlat (Vercel Serverless Function için export gerekiyor)
 if (process.env.NODE_ENV !== 'production') {
