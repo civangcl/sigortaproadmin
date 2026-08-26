@@ -1,125 +1,211 @@
 const prisma = require('../../lib/prisma');
+const supabaseAdmin = require('../../lib/supabase-admin');
 const AppError = require('../../errors/AppError');
+const crypto = require('crypto');
 
-async function createCompany({ context, input }) {
-  if (!context.isSuperAdmin) {
-    throw new AppError('FORBIDDEN', 'Yalnızca SUPERADMIN şirket oluşturabilir.', 403);
+/**
+ * Onboard a new company (tenant) securely.
+ */
+async function onboardCompany({ context, input }) {
+  const { company, owner, branch, website, subscription } = input;
+
+  // 1. Generate customerNo if not provided
+  let customerNo = company.customerNo;
+  if (!customerNo) {
+    const count = await prisma.company.count();
+    customerNo = `SP-${String(count + 1).padStart(6, '0')}`;
   }
 
-  const { name, domain, ownerName, email, adminUserId } = input;
-  
-  const company = await prisma.company.create({
-    data: {
-      name,
-      domain: domain || null,
-      ownerName,
-      email,
-    }
+  // 2. Conflict checks
+  const existingCompany = await prisma.company.findFirst({
+    where: { OR: [{ name: company.name }, { customerNo }] }
   });
+  if (existingCompany) {
+    throw new AppError('CONFLICT', 'Şirket adı veya Müşteri No zaten mevcut.', 409);
+  }
 
-  const user = await prisma.user.create({
-    data: {
-      id: adminUserId, 
-      email,
-      fullName: ownerName,
-      role: 'ADMIN',
-      companyId: company.id
+  // Generate secure temporary password
+  const tempPassword = crypto.randomBytes(12).toString('base64').replace(/[^a-zA-Z0-9]/g, '').slice(0, 16) + 'Aa1!';
+
+  // 3. Supabase Auth Create User
+  let authUser;
+  try {
+    const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
+      email: owner.email,
+      password: tempPassword,
+      email_confirm: true,
+      user_metadata: {
+        fullName: owner.fullName,
+        role: 'OWNER'
+      }
+    });
+
+    if (authError) {
+      if (authError.message.includes('already registered')) {
+        throw new AppError('CONFLICT', 'Bu email ile zaten bir kullanıcı mevcut.', 409);
+      }
+      throw new Error(`Supabase Auth Error: ${authError.message}`);
     }
-  });
+    authUser = authData.user;
+  } catch (err) {
+    if (err instanceof AppError) throw err;
+    throw new AppError('INTERNAL', 'Kullanıcı hesabı oluşturulamadı: ' + err.message, 500);
+  }
 
-  return { company, user };
+  // 4. Prisma Transaction
+  try {
+    const result = await prisma.$transaction(async (tx) => {
+      // Create Company
+      const newCompany = await tx.company.create({
+        data: {
+          name: company.name,
+          customerNo: customerNo,
+          domain: company.domain || null,
+          phone: company.phone || null,
+          email: company.email || null,
+          address: company.address || null,
+          ownerName: owner.fullName
+        }
+      });
+
+      // Create Default Branch
+      const newBranch = await tx.branch.create({
+        data: {
+          companyId: newCompany.id,
+          name: branch.name,
+          isDefault: true,
+          isActive: true
+        }
+      });
+
+      // Create Prisma User
+      const newUser = await tx.user.create({
+        data: {
+          id: authUser.id, // mapped to auth.id
+          email: owner.email,
+          fullName: owner.fullName,
+          role: 'ADMIN', // legacy mapping, though membership resolves this
+          companyId: null // Since SUPERADMIN made companyId optional! Wait, no! For OWNER it should be newCompany.id due to legacy!
+        }
+      });
+
+      // We should set companyId on User for backward compatibility if possible
+      await tx.user.update({
+        where: { id: newUser.id },
+        data: { companyId: newCompany.id }
+      });
+
+      // Create Membership
+      const newMembership = await tx.companyMembership.create({
+        data: {
+          userId: newUser.id,
+          companyId: newCompany.id,
+          role: 'OWNER',
+          status: 'ACTIVE',
+          allBranches: true
+        }
+      });
+
+      // Create Website Integration if requested
+      if (website && website.domain) {
+        await tx.websiteIntegration.create({
+          data: {
+            companyId: newCompany.id,
+            domain: website.domain,
+            defaultBranchId: newBranch.id,
+            status: website.active ? 'ACTIVE' : 'SUSPENDED'
+          }
+        });
+      }
+
+      return {
+        company: newCompany,
+        user: newUser,
+        tempPassword // Return it exactly ONCE
+      };
+    });
+
+    return result;
+  } catch (error) {
+    // COMPENSATING ACTION
+    console.error('Prisma Transaction failed, rolling back Supabase Auth User...', error);
+    await supabaseAdmin.auth.admin.deleteUser(authUser.id).catch(delErr => {
+      console.error('CRITICAL: Failed to rollback Supabase user after Prisma failure!', delErr);
+    });
+    
+    throw new AppError('INTERNAL', 'Firma oluşturulamadı. İşlem geri alındı.', 500);
+  }
 }
 
-const { getPaginationArgs, formatPaginatedResponse } = require('../../utils/pagination');
-
-async function listCompanies({ context, page, limit }) {
-  if (!context.isSuperAdmin) {
-    throw new AppError('FORBIDDEN', 'Yalnızca SUPERADMIN şirketleri görebilir.', 403);
-  }
-
-  const options = getPaginationArgs(page, limit);
-
+async function listCompanies({ page = 1, limit = 50 }) {
+  const skip = (page - 1) * limit;
   const [items, total] = await Promise.all([
     prisma.company.findMany({
+      skip,
+      take: Number(limit),
       orderBy: { createdAt: 'desc' },
-      skip: options.skip,
-      take: options.take,
       include: {
         _count: {
-          select: { clients: true, leads: true, policies: true }
+          select: { branches: true, users: true, clients: true, leads: true, policies: true }
         }
       }
     }),
     prisma.company.count()
   ]);
 
-  // Handle revenue calculation with grouping to avoid N+1 inside JS loop
-  // First, extract company IDs
-  const companyIds = items.map(c => c.id);
-  
-  let revenues = [];
-  if (companyIds.length > 0) {
-    revenues = await prisma.financial.groupBy({
-      by: ['companyId'],
-      where: {
-        companyId: { in: companyIds },
-        kind: 'tahsilat'
-      },
-      _sum: {
-        amount: true
-      }
-    });
-  }
-
-  const revenueMap = revenues.reduce((acc, curr) => {
-    acc[curr.companyId] = curr._sum.amount || 0;
-    return acc;
-  }, {});
-
-  const formattedItems = items.map(c => ({
-    ...c,
-    totalRevenue: revenueMap[c.id] || 0
-  }));
-
-  return formatPaginatedResponse(formattedItems, total, page, limit);
+  return { items, total, page, limit };
 }
 
-async function getCompanyDetails({ context, id }) {
-  if (!context.isSuperAdmin) {
-    throw new AppError('FORBIDDEN', 'Yalnızca SUPERADMIN şirket detaylarını görebilir.', 403);
-  }
-
-  const [company, clients, leads, financials] = await Promise.all([
-    prisma.company.findUnique({
-      where: { id },
-      include: {
-        _count: {
-          select: { clients: true, leads: true, policies: true }
-        }
+async function getCompanyDetails({ id }) {
+  const company = await prisma.company.findUnique({
+    where: { id },
+    include: {
+      branches: true,
+      websiteIntegrations: true,
+      users: true,
+      memberships: {
+        include: { user: true }
+      },
+      _count: {
+        select: { branches: true, users: true, clients: true, leads: true, policies: true }
       }
-    }),
-    prisma.client.findMany({
-      where: { companyId: id },
-      orderBy: { createdAt: 'desc' },
-      take: 10
-    }),
-    prisma.lead.findMany({
-      where: { companyId: id },
-      orderBy: { createdAt: 'desc' },
-      take: 10
-    }),
-    prisma.financial.findMany({
-      where: { companyId: id },
-      orderBy: { date: 'desc' },
-      take: 10
-    })
+    }
+  });
+
+  return { company };
+}
+
+async function getSystemDashboard() {
+  const [totalAgencies, totalBranches, totalUsers, totalClients, totalLeads, totalPolicies] = await Promise.all([
+    prisma.company.count(),
+    prisma.branch.count(),
+    prisma.user.count(),
+    prisma.client.count(),
+    prisma.lead.count(),
+    prisma.policy.count()
   ]);
 
-  return { company, recent: { clients, leads, financials } };
+  // Optionally fetch today's leads etc.
+  const today = new Date();
+  today.setHours(0,0,0,0);
+  const leadsToday = await prisma.lead.count({
+    where: { createdAt: { gte: today } }
+  });
+
+  return {
+    totalAgencies,
+    totalBranches,
+    totalUsers,
+    totalClients,
+    totalLeads,
+    totalPolicies,
+    leadsToday
+  };
 }
 
 module.exports = {
-  createCompany,
+  onboardCompany,
   listCompanies,
-  getCompanyDetails
+  getCompanyDetails,
+  getSystemDashboard
 };

@@ -31,10 +31,20 @@ export async function deleteClient(id: string) {
 }
 
 export async function addPolicy(clientId: string, data: any) {
-  return { success: true }
+  const res = await fetchApi('/policies', {
+    method: 'POST',
+    body: JSON.stringify({ ...data, clientId }),
+  })
+  if (!res.ok) return { success: false, error: 'Poliçe kaydedilemedi.' }
+  const policy = await res.json()
+  return { success: true, policy }
 }
 
 export async function deletePolicy(id: string) {
+  const res = await fetchApi(`/policies/${id}`, {
+    method: 'DELETE',
+  })
+  if (!res.ok) return { success: false, error: 'Poliçe silinemedi.' }
   return { success: true }
 }
 

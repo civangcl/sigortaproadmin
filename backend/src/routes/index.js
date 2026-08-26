@@ -9,6 +9,8 @@ const expensesRoutes = require('../modules/financials/expenses.routes');
 const messagesRoutes = require('../modules/messages/messages.routes');
 const branchesRoutes = require('../modules/branches/branches.routes');
 const staffRoutes = require('../modules/staff/staff.routes');
+const policiesRoutes = require('../modules/policies/policies.routes');
+const invoicesRoutes = require('../modules/invoices/invoices.routes');
 
 const router = express.Router();
 
@@ -26,5 +28,7 @@ router.use('/expenses', expensesRoutes);
 router.use('/messages', messagesRoutes);
 router.use('/branches', branchesRoutes);
 router.use('/staff', staffRoutes);
+router.use('/policies', policiesRoutes);
+router.use('/invoices', invoicesRoutes);
 
 module.exports = router;

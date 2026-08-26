@@ -125,13 +125,39 @@ export function ClientDetailSheet({
   open,
   onOpenChange,
   onUpdateVehicle,
+  onUpdateClient,
 }: {
   client: Client | null
   open: boolean
   onOpenChange: (open: boolean) => void
   onUpdateVehicle?: (id: string, vehicle: Partial<Client['vehicle']>) => void
+  onUpdateClient?: (id: string, clientData: Partial<Client>) => Promise<{success: boolean, error?: string}>
 }) {
   const [editMode, setEditMode] = React.useState(false)
+  const [clientEditMode, setClientEditMode] = React.useState(false)
+  const [clientSaving, setClientSaving] = React.useState(false)
+  const [clientEditForm, setClientEditForm] = React.useState({
+    name: "",
+    phone: "",
+    email: "",
+    tc: "",
+    city: "",
+    address: "",
+  })
+
+  React.useEffect(() => {
+    if (client && clientEditMode) {
+      setClientEditForm({
+        name: client.name || "",
+        phone: client.phone || "",
+        email: client.email !== "-" ? client.email : "",
+        tc: client.tc !== "-" ? client.tc : "",
+        city: client.city !== "-" ? client.city : "",
+        address: client.city !== "-" ? client.city : "", // Mock data didn't have address separately in all views, mapped to city in UI
+      })
+    }
+  }, [client, clientEditMode])
+
   const [editForm, setEditForm] = React.useState({
     brand: "",
     model: "",
@@ -241,117 +267,70 @@ export function ClientDetailSheet({
 
                   <TabsContent value="info" className="mt-4 flex flex-col gap-5">
                     <div className="flex flex-col gap-3">
-                      <span className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
-                        İletişim
-                      </span>
-                      <InfoRow icon={Phone} label="Telefon" value={client.phone} />
-                      <InfoRow icon={Mail} label="E-posta" value={client.email} />
-                      <InfoRow
-                        icon={Hash}
-                        label="TC Kimlik No"
-                        value={client.tc}
-                        mono
-                      />
-                    </div>
-
-                    <Separator />
-
-                    <div className="flex flex-col gap-3">
                       <div className="flex items-center justify-between">
                         <span className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
-                          Araç Detayı
+                          Müşteri Bilgileri
                         </span>
                         <Button 
                           variant="ghost" 
                           size="sm" 
                           className="h-6 text-xs"
-                          onClick={() => setEditMode(!editMode)}
+                          onClick={() => setClientEditMode(!clientEditMode)}
                         >
-                          {editMode ? "İptal" : "Düzenle"}
+                          {clientEditMode ? "İptal" : "Düzenle"}
                         </Button>
                       </div>
-
-                      {editMode ? (
+                      {clientEditMode ? (
                         <div className="flex flex-col gap-3 rounded-lg border border-border bg-muted/10 p-3">
                           <div className="grid gap-2">
-                            <label className="text-[10px] text-muted-foreground">Marka</label>
-                            <Input 
-                              className="h-8 text-xs" 
-                              value={editForm.brand} 
-                              onChange={e => setEditForm(prev => ({...prev, brand: e.target.value}))}
-                            />
+                            <label className="text-[10px] text-muted-foreground">İsim Soyisim</label>
+                            <Input className="h-8 text-xs" value={clientEditForm.name} onChange={e => setClientEditForm(prev => ({...prev, name: e.target.value}))} />
                           </div>
                           <div className="grid gap-2">
-                            <label className="text-[10px] text-muted-foreground">Model</label>
-                            <Input 
-                              className="h-8 text-xs" 
-                              value={editForm.model} 
-                              onChange={e => setEditForm(prev => ({...prev, model: e.target.value}))}
-                            />
+                            <label className="text-[10px] text-muted-foreground">Telefon</label>
+                            <Input className="h-8 text-xs" value={clientEditForm.phone} onChange={e => setClientEditForm(prev => ({...prev, phone: e.target.value}))} />
                           </div>
                           <div className="grid gap-2">
-                            <label className="text-[10px] text-muted-foreground">Yıl</label>
-                            <Input 
-                              type="number"
-                              className="h-8 text-xs" 
-                              value={editForm.year} 
-                              onChange={e => setEditForm(prev => ({...prev, year: parseInt(e.target.value) || new Date().getFullYear()}))}
-                            />
+                            <label className="text-[10px] text-muted-foreground">E-posta</label>
+                            <Input className="h-8 text-xs" type="email" value={clientEditForm.email} onChange={e => setClientEditForm(prev => ({...prev, email: e.target.value}))} />
                           </div>
                           <div className="grid gap-2">
-                            <label className="text-[10px] text-muted-foreground">Motor No</label>
-                            <Input 
-                              className="h-8 text-xs font-mono" 
-                              value={editForm.engineNo} 
-                              onChange={e => setEditForm(prev => ({...prev, engineNo: e.target.value}))}
-                            />
+                            <label className="text-[10px] text-muted-foreground">TC Kimlik No</label>
+                            <Input className="h-8 text-xs font-mono" value={clientEditForm.tc} onChange={e => setClientEditForm(prev => ({...prev, tc: e.target.value}))} />
                           </div>
                           <div className="grid gap-2">
-                            <label className="text-[10px] text-muted-foreground">Şasi No</label>
-                            <Input 
-                              className="h-8 text-xs font-mono" 
-                              value={editForm.chassisNo} 
-                              onChange={e => setEditForm(prev => ({...prev, chassisNo: e.target.value}))}
-                            />
+                            <label className="text-[10px] text-muted-foreground">Şehir / Adres</label>
+                            <Input className="h-8 text-xs" value={clientEditForm.city} onChange={e => setClientEditForm(prev => ({...prev, city: e.target.value}))} />
                           </div>
                           <Button 
                             size="sm" 
                             className="mt-2 w-full"
-                            onClick={() => {
-                              onUpdateVehicle?.(client.id, editForm)
-                              setEditMode(false)
+                            disabled={clientSaving}
+                            onClick={async () => {
+                              if (onUpdateClient) {
+                                setClientSaving(true)
+                                await onUpdateClient(client.id, clientEditForm)
+                                setClientSaving(false)
+                                setClientEditMode(false)
+                              }
                             }}
                           >
-                            Kaydet
+                            {clientSaving ? "Kaydediliyor..." : "Kaydet"}
                           </Button>
                         </div>
                       ) : (
                         <>
-                          <InfoRow
-                            icon={Car}
-                            label="Plaka"
-                            value={client.vehicle.plate}
-                            mono
-                          />
-                          <InfoRow
-                            icon={Car}
-                            label="Marka / Model"
-                            value={`${client.vehicle.brand} ${client.vehicle.model} (${client.vehicle.year})`}
-                          />
+                          <InfoRow icon={Phone} label="Telefon" value={client.phone} />
+                          <InfoRow icon={Mail} label="E-posta" value={client.email} />
                           <InfoRow
                             icon={Hash}
-                            label="Motor No"
-                            value={client.vehicle.engineNo}
-                            mono
-                          />
-                          <InfoRow
-                            icon={Hash}
-                            label="Şasi No"
-                            value={client.vehicle.chassisNo}
+                            label="TC Kimlik No"
+                            value={client.tc}
                             mono
                           />
                         </>
                       )}
+
                     </div>
                   </TabsContent>
 

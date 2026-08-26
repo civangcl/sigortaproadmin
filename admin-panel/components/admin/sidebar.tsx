@@ -15,7 +15,7 @@ import {
   Building2,
   PieChart,
   MessageSquare,
-  FileText,
+
   Settings,
 } from "lucide-react"
 
@@ -201,7 +201,7 @@ function SidebarContent({
         )}
 
         {topItem("clients", "Müşterilerim", Users)}
-        {topItem("invoice", "Fatura Oluştur", FileText)}
+
         {topItem("messages", "Destek Mesajları", MessageSquare)}
         {topItem("profile", "Firma Ayarları", Settings)}
       </nav>

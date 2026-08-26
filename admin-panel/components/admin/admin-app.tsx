@@ -4,8 +4,6 @@ import * as React from "react"
 import { toast } from "sonner"
 
 import {
-  clients as initialClients,
-  leads as initialLeads,
   type Client,
   type Lead,
   type Policy,
@@ -22,29 +20,35 @@ import { ClientsView } from "@/components/admin/clients-view"
 import { ClientDetailSheet } from "@/components/admin/client-detail-sheet"
 import { FinancialView } from "@/components/admin/financial-view"
 import { MessagesView } from "@/components/admin/messages-view"
-import { InvoiceView } from "@/components/admin/invoice-view"
+
 import { ProfileView } from "@/components/admin/profile-view"
 import { getMessages } from "@/app/actions/messages"
 import { getCompanyProfile } from "@/app/actions/admin"
 
-export type ViewId = "dashboard" | "financials" | "clients" | "messages" | "invoice" | "profile" | `leads-${InsuranceType}`
+export type ViewId = "dashboard" | "financials" | "clients" | "messages" | "profile" | `leads-${InsuranceType}`
 
-/** Map a raw backend Offer row into the Lead shape the UI expects */
-function offerToLead(o: ApiOffer): Lead {
+/** Map a raw backend Lead row into the Lead shape the UI expects */
+function mapBackendLead(o: any): Lead {
+  // If it's already mapped (e.g. from mock data fallback), return as is
+  if (o.name && !o.fullName) return o as Lead;
+
   return {
     id: String(o.id),
-    date: o.createdAt,
-    insuranceType: "arac" as InsuranceType, // all web-form submissions are vehicle quotes
-    name: o.fullName,
-    tc: o.tcKimlikNo ?? "—",
+    date: o.createdAt || new Date().toISOString(),
+    insuranceType: (o.insuranceType as InsuranceType) || "arac",
+    name: o.fullName || "İsimsiz",
+    tc: o.tcKimlikNo || "—",
     birthDate: o.dateOfBirth
       ? new Date(o.dateOfBirth).toLocaleDateString("tr-TR")
       : "—",
-    phone: o.phoneNumber,
-    status: o.status === "PENDING" ? "yeni" : "iletildi",
-    note: `Plaka: ${o.licensePlate}`,
+    phone: o.phoneNumber || "—",
+    status: o.status || "yeni",
+    note: o.note || (o.licensePlate ? `Plaka: ${o.licensePlate}` : ""),
     plate: o.licensePlate,
     registrationNo: o.belgeNo ?? undefined,
+    address: o.address,
+    premium: o.premium,
+    commission: o.commission
   }
 }
 
@@ -94,7 +98,8 @@ export function AdminApp() {
       import("@/app/actions/clients").then(m => m.getFinancials())
     ]).then(([leadsData, clientsData, profileData, financialsData]) => {
       if (!mounted) return
-      setLeads(leadsData as any)
+      const mappedLeads: Lead[] = (leadsData as any[]).map(mapBackendLead)
+      setLeads(mappedLeads)
       
       // Map Prisma clients to UI clients format
       const mappedClients: Client[] = clientsData.map((c: any) => ({
@@ -234,6 +239,33 @@ export function AdminApp() {
     }
   }
 
+  async function handleUpdateClient(id: string, data: Partial<Client>) {
+    // Optimistic UI update
+    setClients((prev) =>
+      prev.map((c) => (c.id === id ? { ...c, ...data } : c))
+    )
+    
+    // Server Action call
+    const { updateClient } = await import("@/app/actions/clients")
+    const res = await updateClient(id, {
+      name: data.name,
+      tc: data.tc,
+      phone: data.phone,
+      email: data.email,
+      city: data.city,
+      address: data.city,
+    })
+    
+    if (res.success) {
+      toast.success("Müşteri güncellendi.")
+      return { success: true }
+    } else {
+      toast.error(res.error || "Hata oluştu.")
+      // rollback could be added here
+      return { success: false, error: res.error }
+    }
+  }
+
   async function handleUpdateVehicle(id: string, data: Partial<Client['vehicle']>) {
     // Optimistic UI update
     setClients((prev) =>
@@ -331,9 +363,7 @@ export function AdminApp() {
             {view === "messages" && (
               <MessagesView messages={messages} setMessages={setMessages} />
             )}
-            {view === "invoice" && (
-              <InvoiceView clients={clients} companyProfile={companyProfile} />
-            )}
+
             {view === "profile" && (
               <ProfileView company={companyProfile} onUpdate={setCompanyProfile} />
             )}
@@ -348,6 +378,7 @@ export function AdminApp() {
           if (!open) setSelectedClientId(null)
         }}
         onUpdateVehicle={handleUpdateVehicle}
+        onUpdateClient={handleUpdateClient}
       />
     </div>
   )

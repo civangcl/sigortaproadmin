@@ -19,6 +19,7 @@ datasource db {
 model Company {
   id        String   @id @default(uuid())
   name      String   // e.g. "Ahmet Sigorta"
+  customerNo String? @unique // e.g. "SP-000001"
   domain    String?  @unique // e.g. "ahmetsigorta.com"
   theme     String?  // e.g. "red", "blue" for white-labeling
   logoUrl   String?
@@ -45,6 +46,7 @@ model Company {
   policies   Policy[]
   financials Financial[]
   invoices   Invoice[]
+  websiteIntegrations WebsiteIntegration[]
 }
 
 /// Represents an employee or admin of a Company.
@@ -57,8 +59,8 @@ model User {
   updatedAt DateTime @updatedAt
 
   // Multi-Tenant Link (DEPRECATED: Will be removed in Phase B)
-  companyId String
-  company   Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  companyId String?
+  company   Company?  @relation(fields: [companyId], references: [id], onDelete: Cascade)
   
   // New Membership Link
   memberships CompanyMembership[]
@@ -94,6 +96,22 @@ model Branch {
   leads       Lead[]
   financials  Financial[]
   messages    Message[]
+  websiteIntegrations WebsiteIntegration[]
+
+  @@index([companyId])
+}
+
+model WebsiteIntegration {
+  id              String   @id @default(uuid())
+  companyId       String
+  company         Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  domain          String   @unique
+  defaultBranchId String?
+  branch          Branch?  @relation(fields: [defaultBranchId], references: [id], onDelete: SetNull)
+  status          String   @default("ACTIVE") // ACTIVE, SUSPENDED, ERROR
+  settings        Json?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 
   @@index([companyId])
 }
