@@ -43,7 +43,7 @@ export interface Client {
   financials: FinancialRecord[]
 }
 
-export type InsuranceType = "arac" | "dask" | "saglik" | "konut"
+export type InsuranceType = "arac" | "dask" | "saglik" | "konut" | "kasko" | "trafik" | "is_yeri"
 
 export interface Lead {
   id: string
@@ -70,13 +70,17 @@ export interface Lead {
   chassisNo?: string
   // DASK / Konut alanları
   address?: string
+  formData?: any
 }
 
 export const INSURANCE_TYPES: { id: InsuranceType; label: string }[] = [
   { id: "arac", label: "Araç Sigortası" },
+  { id: "kasko", label: "Kasko" },
+  { id: "trafik", label: "Trafik" },
   { id: "dask", label: "DASK" },
-  { id: "saglik", label: "Sağlık" },
   { id: "konut", label: "Konut" },
+  { id: "is_yeri", label: "İş Yeri" },
+  { id: "saglik", label: "Sağlık" },
 ]
 
 export interface MonthlyProduction {

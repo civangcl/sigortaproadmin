@@ -58,11 +58,14 @@ type Filter = "all" | "yeni" | "iletildi" | "onaylandi" | "silindi"
 
 const DESCRIPTIONS: Record<InsuranceType, string> = {
   arac: "Web sitesi formundan düşen araç sigortası talepleri — Tramer sorgusu için plaka, TC, doğum tarihi ve tescil no'yu tek tıkla kopyalayın.",
+  kasko: "Kasko poliçesi teklif talepleri — araç ve kimlik bilgilerini kullanarak teklif hazırlayın.",
+  trafik: "Trafik poliçesi teklif talepleri — plaka, TC ve belge no ile hızlıca sorgulama yapın.",
   dask: "Zorunlu deprem sigortası (DASK) teklif talepleri — kimlik ve adres bilgilerini kopyalayarak sorgulayın.",
   saglik:
     "Sağlık sigortası teklif talepleri — TC ve doğum tarihi ile risk sorgusu yapın.",
   konut:
     "Konut ve eşya sigortası teklif talepleri — kimlik ve adres bilgilerini kopyalayarak teklif hazırlayın.",
+  is_yeri: "İş yeri sigortası teklif talepleri — vergi numarası ve faaliyet alanı ile teklif çalışın."
 }
 
 export function LeadsView({
@@ -103,9 +106,9 @@ export function LeadsView({
 
   const deletedCount = scoped.filter((l) => l.status === "silindi").length
 
-  const showPlate = insuranceType === "arac"
-  const showRegistration = insuranceType === "arac"
-  const showAddress = insuranceType === "dask" || insuranceType === "konut"
+  const showPlate = ["arac", "kasko", "trafik"].includes(insuranceType)
+  const showRegistration = ["arac", "kasko", "trafik"].includes(insuranceType)
+  const showAddress = ["dask", "konut", "is_yeri"].includes(insuranceType)
 
   const openModal = (lead: Lead, type: "iletildi" | "onaylandi") => {
     setModal({ open: true, leadId: lead.id, type })

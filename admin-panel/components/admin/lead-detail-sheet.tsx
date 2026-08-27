@@ -3,7 +3,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { CopyField } from "@/components/admin/copy-field"
-import { formatCurrency, formatDate } from "@/lib/mock-data"
+import { formatCurrency, formatDate, INSURANCE_TYPES } from "@/lib/mock-data"
 import { MessageCircle, Check, Phone } from "lucide-react"
 import { toast } from "sonner"
 
@@ -38,7 +38,17 @@ export function LeadDetailSheet({
     }
 
     const formattedAmount = formatCurrency(lead.premium);
-    const message = `Merhaba ${lead.name},\n\n${companyName} tarafından hazırlanan ${lead.insuranceType.toUpperCase()} teklifiniz ${formattedAmount}'dir.\n\nBu tutarı onaylıyor musunuz?\n\nEVET / HAYIR`;
+    
+    // Find friendly label for insurance type
+    const insuranceTypeObj = INSURANCE_TYPES.find(t => t.id === lead.insuranceType);
+    const friendlyType = insuranceTypeObj ? insuranceTypeObj.label : lead.insuranceType.toUpperCase();
+    // Add "sigortası" suffix if it doesn't have it (except DASK/Kasko which are often used alone, but user example: "Kasko teklifiniz hazırlanmıştır. İş Yeri Sigortası teklifiniz...")
+    let typeDisplay = friendlyType;
+    if (friendlyType === 'İş Yeri' || friendlyType === 'Konut' || friendlyType === 'Sağlık') {
+       typeDisplay += ' Sigortası';
+    }
+
+    const message = `Merhaba ${lead.name},\n\n${companyName} tarafından hazırlanan ${typeDisplay} teklifiniz ${formattedAmount}'dir.\n\nBu tutarı onaylıyor musunuz?\n\nEVET / HAYIR`;
     const encodedMessage = encodeURIComponent(message);
     
     window.open(`https://wa.me/${normalizedPhone}?text=${encodedMessage}`, '_blank');
@@ -75,12 +85,24 @@ export function LeadDetailSheet({
                 <span className="text-muted-foreground">Doğum Tarihi</span>
                 <span>{lead.birthDate}</span>
               </div>
+              {lead.city && (
+                <div className="flex justify-between items-center py-1 border-b">
+                  <span className="text-muted-foreground">İl</span>
+                  <span>{lead.city}</span>
+                </div>
+              )}
+              {lead.address && (
+                <div className="flex justify-between items-center py-1 border-b">
+                  <span className="text-muted-foreground">Adres</span>
+                  <span className="font-medium text-right break-all ml-4 max-w-[200px]">{lead.address}</span>
+                </div>
+              )}
             </div>
           </div>
 
-          {(lead.plate || lead.registrationNo) && (
+          {(lead.plate || lead.registrationNo || (lead.formData && Object.keys(lead.formData).length > 0)) && (
             <div>
-              <h3 className="text-sm font-semibold mb-2">Araç Bilgileri</h3>
+              <h3 className="text-sm font-semibold mb-2">Ek Bilgiler</h3>
               <div className="grid gap-2 text-sm">
                 {lead.plate && (
                   <div className="flex justify-between items-center py-1 border-b">
@@ -94,6 +116,36 @@ export function LeadDetailSheet({
                     <CopyField value={lead.registrationNo} />
                   </div>
                 )}
+                {lead.formData && Object.entries(lead.formData).map(([key, value]) => {
+                  if (value === null || value === undefined || value === '') return null;
+                  
+                  // Simple human readable mapper
+                  const labels: Record<string, string> = {
+                    buildingYear: 'Bina Yapım Yılı',
+                    buildingFloorCount: 'Bina Kat Sayısı',
+                    apartmentFloor: 'Daire Katı',
+                    grossSquareMeters: 'Brüt m²',
+                    buildingType: 'Yapı Tarzı',
+                    brand: 'Marka',
+                    model: 'Model',
+                    year: 'Model Yılı',
+                    chassisNo: 'Şasi No',
+                    propertyType: 'Konut Tipi',
+                    buildingAge: 'Bina Yaşı',
+                    floor: 'Bulunduğu Kat',
+                    businessName: 'Firma Adı',
+                    businessType: 'Faaliyet Alanı',
+                    taxNumber: 'Vergi Numarası',
+                    coverageType: 'Sigorta Tipi'
+                  };
+
+                  return (
+                    <div key={key} className="flex justify-between items-center py-1 border-b">
+                      <span className="text-muted-foreground">{labels[key] || key}</span>
+                      <span className="font-medium text-right break-all ml-4">{String(value)}</span>
+                    </div>
+                  )
+                })}
               </div>
             </div>
           )}

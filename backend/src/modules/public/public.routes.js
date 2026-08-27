@@ -5,19 +5,7 @@ const prisma = new PrismaClient();
 
 const router = express.Router();
 
-// Strict but simple validation schemas for the exact payload sent by the frontend
-const leadSchema = z.object({
-  insuranceType: z.string().optional().nullable(),
-  fullName: z.string().min(1, 'Ad soyad zorunludur'),
-  tcIdentity: z.string().optional().nullable(),
-  phone: z.string().min(1, 'Telefon zorunludur'),
-  email: z.string().optional().nullable(),
-  dateOfBirth: z.string().optional().nullable(),
-  city: z.string().optional().nullable(),
-  address: z.string().optional().nullable(),
-  licensePlate: z.string().optional().nullable(),
-  documentNo: z.string().optional().nullable()
-});
+const { createPublicLeadSchema } = require('../leads/leads.schema');
 
 const contactSchema = z.object({
   fullName: z.string().min(1, 'Ad soyad zorunludur'),
@@ -51,7 +39,7 @@ const validate = (schema) => (req, res, next) => {
 };
 
 // POST /api/public/firat-ece/lead
-router.post('/firat-ece/lead', validate(leadSchema), async (req, res) => {
+router.post('/firat-ece/lead', validate(createPublicLeadSchema.body), async (req, res) => {
   try {
     const companyId = process.env.FIRAT_ECE_COMPANY_ID || 'f74c889c-1887-40fc-8710-3630bccff59d';
     const data = req.validatedBody;
@@ -66,14 +54,11 @@ router.post('/firat-ece/lead', validate(leadSchema), async (req, res) => {
     });
     const branchId = defaultBranch ? defaultBranch.id : undefined;
 
-    const inputType = (data.insuranceType || '').toLowerCase();
-    const insuranceType = inputType === 'dask' || inputType === 'konut' ? 'dask' : 'arac';
-
     const lead = await prisma.lead.create({
       data: {
         companyId,
         branchId,
-        insuranceType,
+        insuranceType: data.insuranceType,
         fullName: data.fullName,
         tcKimlikNo: data.tcIdentity,
         phoneNumber: data.phone,
@@ -83,6 +68,7 @@ router.post('/firat-ece/lead', validate(leadSchema), async (req, res) => {
         address: data.address,
         licensePlate: data.licensePlate,
         belgeNo: data.documentNo,
+        formData: data.formData,
         status: 'yeni'
       }
     });
