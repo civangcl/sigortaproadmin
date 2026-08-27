@@ -59,3 +59,15 @@ export async function updateClientDetails(id: string, data: any) {
   })
   return res.json()
 }
+
+export async function getNotifications(unreadOnly = false) {
+  const res = await fetchApi(`/notifications?unreadOnly=${unreadOnly}`, { cache: 'no-store' })
+  if (!res.ok) return []
+  const data = await res.json()
+  return data.data || []
+}
+
+export async function markNotificationAsRead(id: string) {
+  const res = await fetchApi(`/notifications/${id}/read`, { method: 'PATCH' })
+  return res.json()
+}

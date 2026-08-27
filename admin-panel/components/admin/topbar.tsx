@@ -1,6 +1,6 @@
 "use client"
 
-import { Menu, Search, Bell } from "lucide-react"
+import { Menu, Search, Bell, Settings, Info } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -14,9 +14,17 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { type Client, type Lead, daysUntilExpiry } from "@/lib/mock-data"
 import type { ViewId } from "@/components/admin/admin-app"
+import { usePushNotifications } from "@/hooks/use-push-notifications"
+import * as React from "react"
+import { toast } from "sonner"
 
 const TITLES: Record<ViewId, { title: string; subtitle: string }> = {
   dashboard: {
@@ -51,10 +59,6 @@ const TITLES: Record<ViewId, { title: string; subtitle: string }> = {
     title: "Destek Mesajları",
     subtitle: "Sitenizden gelen müşteri mesajları",
   },
-  invoice: {
-    title: "Fatura Oluştur",
-    subtitle: "Tahsilat makbuzu ve proforma fatura düzenleyin",
-  },
   profile: {
     title: "Firma Ayarları",
     subtitle: "Acente bilgileri, banka hesapları ve fatura ayarları",
@@ -67,14 +71,19 @@ export function Topbar({
   leads = [],
   clients = [],
   messages = [],
+  dbNotifications = [],
+  onNotificationClick,
 }: {
   view: ViewId
   onOpenMobileNav: () => void
   leads?: Lead[]
   clients?: Client[]
   messages?: any[]
+  dbNotifications?: any[]
+  onNotificationClick?: (n: any) => void
 }) {
-  const { title, subtitle } = TITLES[view]
+  // Use fallback if view is somehow not in TITLES (e.g. invoice which was removed)
+  const { title, subtitle } = TITLES[view] || { title: "Sayfa", subtitle: "" }
   const today = new Date().toLocaleDateString("tr-TR", {
     weekday: "long",
     day: "numeric",
@@ -82,15 +91,35 @@ export function Topbar({
     year: "numeric",
   })
 
-  const pendingQuotes = leads.filter(l => l.status === "yeni")
-  const unreadMessages = messages.filter(m => m.status === "yeni")
-  const allPolicies = clients.flatMap(c => c.policies.map(p => ({ client: c, policy: p })))
-  const upcomingRenewals = allPolicies
-    .map(entry => ({ ...entry, days: daysUntilExpiry(entry.policy) }))
-    .filter(entry => entry.days >= 0 && entry.days <= 7)
-    .sort((a, b) => a.days - b.days)
+  const { isSupported, isSubscribed, subscribe, permission } = usePushNotifications()
+  const [isIOS, setIsIOS] = React.useState(false)
+  const [isStandalone, setIsStandalone] = React.useState(true)
 
-  const notificationCount = pendingQuotes.length + upcomingRenewals.length + unreadMessages.length
+  React.useEffect(() => {
+    if (typeof window !== "undefined") {
+      const ios = /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream
+      setIsIOS(ios)
+      // Check if running as PWA
+      const standalone = window.matchMedia('(display-mode: standalone)').matches || ('standalone' in navigator && (navigator as any).standalone)
+      setIsStandalone(!!standalone)
+    }
+  }, [])
+
+  const handleSubscribe = async () => {
+    if (isIOS && !isStandalone) {
+      toast.info(
+        "iPhone'da yeni teklif bildirimleri almak için SigortaPro'yu Ana Ekranınıza ekleyin.",
+        {
+          description: "Safari'de Paylaş ikonuna basın, ardından 'Ana Ekrana Ekle' seçeneğini seçin. Ana ekrandaki uygulamadan giriş yapıp bildirimleri açabilirsiniz.",
+          duration: 10000,
+        }
+      )
+      return
+    }
+    await subscribe()
+  }
+
+  const notificationCount = dbNotifications.length
 
   return (
     <header className="print:hidden sticky top-0 z-30 flex h-16 items-center gap-3 border-b border-border bg-background/80 px-4 backdrop-blur-md md:px-8">
@@ -114,6 +143,13 @@ export function Topbar({
       </div>
 
       <div className="ml-auto flex items-center gap-2">
+        {isIOS && !isStandalone && (
+          <Tooltip>
+            <TooltipTrigger render={<Button variant="outline" size="icon-sm" onClick={handleSubscribe} className="text-primary hover:text-primary"><Info className="size-4" /></Button>} />
+            <TooltipContent>iPhone'da bildirimleri açmak için tıklayın</TooltipContent>
+          </Tooltip>
+        )}
+
         <div className="relative hidden lg:block">
           <Search className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
           <Input
@@ -135,7 +171,14 @@ export function Topbar({
             )}
           </div>
           <DropdownMenuContent align="end" className="w-80">
-            <div className="px-3 py-2 text-sm font-semibold">Bildirimler</div>
+            <div className="flex items-center justify-between px-3 py-2">
+              <span className="text-sm font-semibold">Bildirimler</span>
+              {isSupported && !isSubscribed && (
+                <Button variant="secondary" size="sm" className="h-7 text-xs" onClick={handleSubscribe}>
+                  Bildirimleri Aç
+                </Button>
+              )}
+            </div>
             <DropdownMenuSeparator />
             <ScrollArea className="h-max max-h-[60vh]">
               {notificationCount === 0 ? (
@@ -143,43 +186,20 @@ export function Topbar({
                   Şu an için yeni bir bildiriminiz yok.
                 </div>
               ) : (
-                <>
-                  {unreadMessages.length > 0 && (
-                    <DropdownMenuGroup>
-                      <DropdownMenuLabel className="text-xs font-normal text-muted-foreground px-2">Yeni Mesajlar</DropdownMenuLabel>
-                      {unreadMessages.map(m => (
-                        <DropdownMenuItem key={m.id} className="flex flex-col items-start gap-1 p-3 cursor-pointer">
-                          <span className="font-medium text-sm">{m.fullName}</span>
-                          <span className="text-xs text-muted-foreground truncate w-full">{m.message}</span>
-                        </DropdownMenuItem>
-                      ))}
-                    </DropdownMenuGroup>
-                  )}
-                  {unreadMessages.length > 0 && pendingQuotes.length > 0 && <DropdownMenuSeparator />}
-                  {pendingQuotes.length > 0 && (
-                    <DropdownMenuGroup>
-                      <DropdownMenuLabel className="text-xs font-normal text-muted-foreground px-2">Yeni Talepler</DropdownMenuLabel>
-                      {pendingQuotes.map(q => (
-                        <DropdownMenuItem key={q.id} className="flex flex-col items-start gap-1 p-3 cursor-pointer">
-                          <span className="font-medium text-sm">{q.name}</span>
-                          <span className="text-xs text-muted-foreground">{q.insuranceType.toUpperCase()} Teklifi (Plaka: {q.plate || "—"})</span>
-                        </DropdownMenuItem>
-                      ))}
-                    </DropdownMenuGroup>
-                  )}
-                  {(unreadMessages.length > 0 || pendingQuotes.length > 0) && upcomingRenewals.length > 0 && <DropdownMenuSeparator />}
-                  {upcomingRenewals.length > 0 && (
-                    <DropdownMenuGroup>
-                      <DropdownMenuLabel className="text-xs font-normal text-muted-foreground px-2">Yaklaşan Poliçeler (7 Gün)</DropdownMenuLabel>
-                      {upcomingRenewals.map(r => (
-                        <DropdownMenuItem key={r.policy.id} className="flex flex-col items-start gap-1 p-3 cursor-pointer">
-                          <span className="font-medium text-sm">{r.client.name}</span>
-                          <span className="text-xs text-destructive/80 font-medium">{r.policy.type} - {r.days === 0 ? "Bugün bitiyor!" : `${r.days} gün kaldı`}</span>
-                        </DropdownMenuItem>
-                      ))}
-                    </DropdownMenuGroup>
-                  )}
-                </>
+                <DropdownMenuGroup>
+                  <DropdownMenuLabel className="text-xs font-normal text-muted-foreground px-2">Yeni Bildirimler</DropdownMenuLabel>
+                  {dbNotifications.map(n => (
+                    <DropdownMenuItem 
+                      key={n.id} 
+                      className="flex flex-col items-start gap-1 p-3 cursor-pointer"
+                      onClick={() => onNotificationClick?.(n)}
+                    >
+                      <span className="font-medium text-sm">{n.title}</span>
+                      <span className="text-xs text-muted-foreground truncate w-full whitespace-normal">{n.body}</span>
+                      <span className="text-[10px] text-muted-foreground/60">{new Date(n.createdAt).toLocaleTimeString("tr-TR", { hour: '2-digit', minute: '2-digit' })}</span>
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuGroup>
               )}
             </ScrollArea>
           </DropdownMenuContent>

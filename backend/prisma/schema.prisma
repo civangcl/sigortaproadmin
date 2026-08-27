@@ -41,12 +41,13 @@ model Company {
   branches   Branch[]
   memberships CompanyMembership[]
   leads      Lead[]
-  messages   Message[]
-  clients    Client[]
-  policies   Policy[]
-  financials Financial[]
-  invoices   Invoice[]
+  messages    Message[]
+  policies    Policy[]
+  clients     Client[]
+  financials  Financial[]
+  invoices    Invoice[]
   websiteIntegrations WebsiteIntegration[]
+  notifications Notification[]
 }
 
 /// Represents an employee or admin of a Company.
@@ -64,6 +65,8 @@ model User {
   
   // New Membership Link
   memberships CompanyMembership[]
+  notifications Notification[]
+  pushSubscriptions PushSubscription[]
 }
 
 enum Role {
@@ -97,6 +100,7 @@ model Branch {
   financials  Financial[]
   messages    Message[]
   websiteIntegrations WebsiteIntegration[]
+  notifications Notification[]
 
   @@index([companyId])
 }
@@ -327,3 +331,42 @@ model InvoiceItem {
   invoice     Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
 }
 
+
+model Notification {
+  id          String   @id @default(uuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  companyId   String
+  company     Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  branchId    String?
+  branch      Branch?  @relation(fields: [branchId], references: [id], onDelete: SetNull)
+  type        String   // e.g. "LEAD_CREATED"
+  title       String
+  body        String
+  entityType  String?  // e.g. "LEAD"
+  entityId    String?
+  isRead      Boolean  @default(false)
+  readAt      DateTime?
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([userId, isRead])
+  @@index([companyId])
+}
+
+model PushSubscription {
+  id          String   @id @default(uuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  endpoint    String   @unique
+  p256dh      String
+  auth        String
+  userAgent   String?
+  isActive    Boolean  @default(true)
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([userId])
+}

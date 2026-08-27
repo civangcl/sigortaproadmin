@@ -17,8 +17,13 @@ const router = express.Router();
 // Mount modules
 const publicRoutes = require('../modules/public/public.routes');
 
+const pushRoutes = require('../modules/push/push.routes');
+const notificationsRoutes = require('../modules/notifications/notifications.routes');
+
 router.get('/status', (req, res) => res.json({ status: 'OK', timestamp: new Date(), version: '1.0.0' }));
 router.use('/public', publicRoutes);
+router.use('/push', pushRoutes);
+router.use('/notifications', notificationsRoutes);
 router.use('/system/companies', systemRoutes);
 router.use('/company', companyRoutes);
 router.use('/clients', clientsRoutes);

@@ -1,7 +1,8 @@
 "use client"
 
 import * as React from "react"
-import { Check, Trash2, Inbox, Phone, Banknote, RotateCcw, Pencil } from "lucide-react"
+import { toast } from "sonner"
+import { Check, Trash2, Inbox, Phone, Banknote, RotateCcw, Pencil, MessageCircle } from "lucide-react"
 
 import {
   Card,
@@ -65,12 +66,14 @@ const DESCRIPTIONS: Record<InsuranceType, string> = {
 }
 
 export function LeadsView({
+  companyName = "SigortaPro",
   insuranceType,
   leads,
   onUpdateLead,
   onDelete,
   onRestore,
 }: {
+  companyName?: string
   insuranceType: InsuranceType
   leads: Lead[]
   onUpdateLead: (id: string, status: "iletildi" | "onaylandi", premium?: number | null, commission?: number | null) => void
@@ -120,6 +123,32 @@ export function LeadsView({
     )
     setModal({ open: false, leadId: null, type: "onaylandi" })
   }
+
+  const handleWhatsApp = (lead: Lead) => {
+    if (!lead.phone) {
+      toast.error("Müşteri telefon numarası bulunamadı.");
+      return;
+    }
+    if (!lead.premium) {
+      toast.error("Lütfen önce bir teklif tutarı (prim) giriniz.");
+      return;
+    }
+
+    let normalizedPhone = lead.phone.replace(/[\s\-\(\)\+]/g, '');
+    if (normalizedPhone.startsWith('0')) {
+      normalizedPhone = '90' + normalizedPhone.slice(1);
+    } else if (!normalizedPhone.startsWith('90')) {
+      normalizedPhone = '90' + normalizedPhone;
+    }
+
+    const formattedAmount = formatCurrency(lead.premium);
+    const message = `Merhaba ${lead.name},\n\n${companyName} tarafından hazırlanan ${label} teklifiniz ${formattedAmount}'dir.\n\nBu tutarı onaylıyor musunuz?\n\nEVET / HAYIR`;
+    const encodedMessage = encodeURIComponent(message);
+    
+    window.open(`https://wa.me/${normalizedPhone}?text=${encodedMessage}`, '_blank');
+    toast.success("Mesaj WhatsApp'ta hazırlandı.");
+  }
+
 
   return (
     <Card className="overflow-hidden">
@@ -313,9 +342,29 @@ export function LeadsView({
                                 >
                                   <Check className="size-4" />
                                 </TooltipTrigger>
-                                <TooltipContent>Müşteriye teklif iletildi</TooltipContent>
+                                <TooltipContent>Müşteriye teklif iletildi olarak işaretle</TooltipContent>
                               </Tooltip>
                             )}
+
+                            <Tooltip>
+                              <TooltipTrigger
+                                render={
+                                  <Button
+                                    variant="ghost"
+                                    size="icon-sm"
+                                    disabled={!lead.phone}
+                                    onClick={() => handleWhatsApp(lead)}
+                                    aria-label="WhatsApp İle İlet"
+                                    className="text-[#25D366] hover:text-[#25D366] hover:bg-[#25D366]/10 disabled:opacity-50"
+                                  />
+                                }
+                              >
+                                <MessageCircle className="size-4" />
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                {!lead.phone ? "Müşteri telefon numarası bulunamadı." : "WhatsApp üzerinden teklifi ilet"}
+                              </TooltipContent>
+                            </Tooltip>
 
                             <Tooltip>
                               <TooltipTrigger

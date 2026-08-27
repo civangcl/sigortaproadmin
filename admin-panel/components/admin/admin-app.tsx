@@ -18,6 +18,7 @@ import { DashboardView } from "@/components/admin/dashboard-view"
 import { LeadsView } from "@/components/admin/leads-view"
 import { ClientsView } from "@/components/admin/clients-view"
 import { ClientDetailSheet } from "@/components/admin/client-detail-sheet"
+import { LeadDetailSheet } from "@/components/admin/lead-detail-sheet"
 import { FinancialView } from "@/components/admin/financial-view"
 import { MessagesView } from "@/components/admin/messages-view"
 
@@ -59,14 +60,29 @@ export function AdminApp() {
 
   const [leads, setLeads] = React.useState<Lead[]>([])
   const [messages, setMessages] = React.useState<any[]>([])
+  const [notifications, setNotifications] = React.useState<any[]>([])
   const [companyProfile, setCompanyProfile] = React.useState<any>(null)
   const [leadsLoading, setLeadsLoading] = React.useState(false)
   const [selectedClientId, setSelectedClientId] = React.useState<string | null>(
     null
   )
+  const [selectedLeadId, setSelectedLeadId] = React.useState<string | null>(null)
 
   const [clients, setClients] = React.useState<Client[]>([])
   const [financials, setFinancials] = React.useState<any[]>([])
+
+  const handleNotificationClick = async (n: any) => {
+    if (!n.isRead) {
+      import("@/app/actions/admin").then(m => m.markNotificationAsRead(n.id))
+      setNotifications(prev => prev.map(notif => notif.id === n.id ? { ...notif, isRead: true } : notif))
+    }
+    
+    if (n.entityType === 'LEAD' && n.entityId) {
+      setSelectedLeadId(n.entityId)
+      // Find the lead's insuranceType to switch the active view if desired, 
+      // but opening the sheet directly is faster.
+    }
+  }
 
   React.useEffect(() => {
     // Check session on mount
@@ -145,6 +161,10 @@ export function AdminApp() {
     // Fetch messages separately or adjust getMessages
     getMessages("temp").then(msgs => {
       if (mounted) setMessages(msgs)
+    })
+
+    import("@/app/actions/admin").then(m => m.getNotifications(true)).then(n => {
+      if (mounted) setNotifications(n)
     })
 
     return () => {
@@ -334,6 +354,8 @@ export function AdminApp() {
           leads={leads}
           clients={clients}
           messages={messages}
+          dbNotifications={notifications}
+          onNotificationClick={handleNotificationClick}
         />
 
         <main className="flex-1 overflow-x-hidden print:overflow-visible px-4 py-6 md:px-8 md:py-8 print:p-0 print:m-0">
@@ -346,6 +368,7 @@ export function AdminApp() {
             )}
             {view.startsWith("leads-") && (
               <LeadsView
+                companyName={companyProfile?.name}
                 insuranceType={view.replace("leads-", "") as InsuranceType}
                 leads={leads}
                 onUpdateLead={handleUpdateLead}
@@ -379,6 +402,14 @@ export function AdminApp() {
         }}
         onUpdateVehicle={handleUpdateVehicle}
         onUpdateClient={handleUpdateClient}
+      />
+      <LeadDetailSheet
+        companyName={companyProfile?.name}
+        lead={leads.find(l => l.id === selectedLeadId)}
+        open={selectedLeadId !== null}
+        onOpenChange={(open) => {
+          if (!open) setSelectedLeadId(null)
+        }}
       />
     </div>
   )

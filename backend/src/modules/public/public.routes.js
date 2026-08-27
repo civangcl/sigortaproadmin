@@ -59,7 +59,7 @@ router.post('/firat-ece/lead', validate(leadSchema), async (req, res) => {
     const inputType = (data.insuranceType || '').toLowerCase();
     const insuranceType = inputType === 'dask' || inputType === 'konut' ? 'dask' : 'arac';
 
-    await prisma.lead.create({
+    const lead = await prisma.lead.create({
       data: {
         companyId,
         insuranceType,
@@ -75,6 +75,13 @@ router.post('/firat-ece/lead', validate(leadSchema), async (req, res) => {
         status: 'yeni'
       }
     });
+
+    try {
+      const NotificationService = require('../../services/notification.service');
+      await NotificationService.notifyNewLead(lead, companyId);
+    } catch (pushErr) {
+      console.error('Non-fatal error notifying lead:', pushErr);
+    }
 
     res.status(201).json({ success: true });
   } catch (err) {
