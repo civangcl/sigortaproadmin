@@ -82,28 +82,41 @@ export function SystemAdminApp() {
   }
 
   return (
-    <div className="flex min-h-screen bg-slate-50 text-slate-900">
+    <div className="flex min-h-screen bg-[#090C10] text-slate-100">
       <SystemSidebar activeView={activeView} onNavigate={setActiveView} />
       
       <div className="flex-1 flex flex-col min-w-0">
-        <header className="h-16 flex items-center justify-between px-8 bg-white border-b sticky top-0 z-10">
-          <h1 className="font-semibold text-lg text-slate-800">
-            {activeView === "dashboard" && "Genel Bakış"}
-            {activeView === "companies" && "Acenteler"}
-            {activeView === "onboard" && "Yeni Acente Onboarding"}
-            {activeView === "users" && "Platform Kullanıcıları"}
-            {activeView === "websites" && "Websiteleri"}
-            {activeView === "billing" && "Abonelik Yönetimi"}
-            {activeView === "activity" && "Sistem Aktivitesi"}
-            {activeView === "settings" && "Platform Ayarları"}
-          </h1>
-          <Button variant="ghost" size="sm" onClick={handleLogout} className="text-muted-foreground">
-            <LogOut className="size-4 mr-2" /> Çıkış Yap
-          </Button>
+        <header className="h-16 flex items-center justify-between px-8 bg-[#0D1117] border-b border-white/5 sticky top-0 z-10">
+          <div className="flex items-center text-sm font-medium text-slate-400">
+            SigortaPro <span className="mx-2">/</span> 
+            <span className="text-slate-100">
+              {activeView === "dashboard" && "Genel Bakış"}
+              {activeView === "companies" && "Acenteler"}
+              {activeView === "onboard" && "Yeni Acente Onboarding"}
+              {activeView === "users" && "Platform Kullanıcıları"}
+              {activeView === "websites" && "Websiteleri"}
+              {activeView === "billing" && "Abonelik Yönetimi"}
+              {activeView === "activity" && "Sistem Aktivitesi"}
+              {activeView === "settings" && "Platform Ayarları"}
+            </span>
+          </div>
+          <div className="flex items-center gap-4">
+            <div className="hidden md:flex items-center gap-2">
+              <div className="size-2 rounded-full bg-blue-500 animate-pulse"></div>
+              <span className="text-xs font-medium text-slate-400">API Online</span>
+            </div>
+            <div className="h-4 w-px bg-white/10 hidden md:block"></div>
+            <div className="flex items-center gap-2 text-sm">
+              <span className="text-slate-300">Süper Admin</span>
+              <Button variant="ghost" size="sm" onClick={handleLogout} className="text-slate-400 hover:text-white hover:bg-white/10 ml-2">
+                <LogOut className="size-4" />
+              </Button>
+            </div>
+          </div>
         </header>
 
         <main className="flex-1 overflow-auto p-4 md:p-8">
-          <div className="mx-auto max-w-6xl">
+          <div className="mx-auto max-w-7xl">
             {activeView === "dashboard" && <SystemDashboard data={dashboardData} />}
             {activeView === "companies" && (
               <SystemCompanies 
@@ -116,11 +129,11 @@ export function SystemAdminApp() {
             
             {["users", "websites", "billing", "activity", "settings"].includes(activeView) && (
               <div className="flex flex-col items-center justify-center py-24 text-center animate-in fade-in">
-                <div className="size-16 rounded-2xl bg-muted flex items-center justify-center mb-4">
+                <div className="size-16 rounded-2xl bg-white/5 flex items-center justify-center mb-4">
                   <span className="text-2xl">🚧</span>
                 </div>
-                <h3 className="text-lg font-semibold">Yapım Aşamasında</h3>
-                <p className="text-muted-foreground mt-2 max-w-md">
+                <h3 className="text-lg font-semibold text-slate-200">Yapım Aşamasında</h3>
+                <p className="text-slate-400 mt-2 max-w-md">
                   Bu modül henüz backend API'lerine bağlanmadı veya geliştirme aşamasında.
                 </p>
               </div>

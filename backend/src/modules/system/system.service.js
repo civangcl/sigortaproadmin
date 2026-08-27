@@ -176,30 +176,69 @@ async function getCompanyDetails({ id }) {
 }
 
 async function getSystemDashboard() {
-  const [totalAgencies, totalBranches, totalUsers, totalClients, totalLeads, totalPolicies] = await Promise.all([
-    prisma.company.count(),
-    prisma.branch.count(),
-    prisma.user.count(),
-    prisma.client.count(),
-    prisma.lead.count(),
-    prisma.policy.count()
-  ]);
-
-  // Optionally fetch today's leads etc.
-  const today = new Date();
-  today.setHours(0,0,0,0);
-  const leadsToday = await prisma.lead.count({
-    where: { createdAt: { gte: today } }
-  });
-
-  return {
-    totalAgencies,
-    totalBranches,
+  const [
+    totalCompanies,
     totalUsers,
     totalClients,
     totalLeads,
     totalPolicies,
-    leadsToday
+    newLeads,
+    recentCompanies,
+    last7DaysLeads
+  ] = await Promise.all([
+    prisma.company.count(),
+    prisma.user.count(),
+    prisma.client.count(),
+    prisma.lead.count(),
+    prisma.policy.count(),
+    prisma.lead.count({ where: { status: 'yeni' } }),
+    prisma.company.findMany({
+      take: 5,
+      orderBy: { createdAt: 'desc' },
+      select: { id: true, name: true, domain: true, customerNo: true, createdAt: true }
+    }),
+    prisma.lead.findMany({
+      where: {
+        createdAt: {
+          gte: new Date(new Date().setDate(new Date().getDate() - 7))
+        }
+      },
+      select: { createdAt: true }
+    })
+  ]);
+
+  // We consider all companies active for now as there's no explicit 'status' column in Company
+  const activeCompanies = totalCompanies; 
+
+  // Process leadTrend for last 7 days
+  const trendMap = {};
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date();
+    d.setDate(d.getDate() - i);
+    const dateStr = d.toISOString().split('T')[0];
+    trendMap[dateStr] = 0;
+  }
+  
+  last7DaysLeads.forEach(lead => {
+    const dateStr = lead.createdAt.toISOString().split('T')[0];
+    if (trendMap[dateStr] !== undefined) {
+      trendMap[dateStr]++;
+    }
+  });
+
+  const leadTrend = Object.keys(trendMap).map(date => ({
+    date,
+    count: trendMap[date]
+  }));
+
+  return {
+    companies: { total: totalCompanies, active: activeCompanies },
+    users: { total: totalUsers },
+    clients: { total: totalClients },
+    leads: { total: totalLeads, new: newLeads },
+    policies: { total: totalPolicies },
+    leadTrend,
+    recentCompanies
   };
 }
 
