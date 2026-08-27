@@ -1,7 +1,8 @@
 import { SystemAdminApp } from "@/components/admin/system-admin-app"
 
 export const metadata = {
-  title: "Süper Admin | SigortaPanel Pro",
+  title: "SigortaPro Control Center",
+  description: "SigortaPro platform yönetim paneli.",
 }
 
 export default function SystemAdminPage() {

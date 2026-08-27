@@ -13,7 +13,7 @@ router.use(authenticateUser, requireRole(['SUPERADMIN']));
 
 router.get('/dashboard', asyncHandler(systemController.getSystemDashboard));
 router.post('/onboard', validate(schemas.createOnboardSchema), asyncHandler(systemController.onboardCompany));
-router.get('/', validate({ query: paginationSchema }), asyncHandler(systemController.listCompanies));
+router.get('/companies', validate({ query: paginationSchema }), asyncHandler(systemController.listCompanies));
 router.get('/:id/details', validate(schemas.getCompanyDetailsSchema), asyncHandler(systemController.getCompanyDetails));
 
 module.exports = router;

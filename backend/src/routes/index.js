@@ -24,7 +24,7 @@ router.get('/status', (req, res) => res.json({ status: 'OK', timestamp: new Date
 router.use('/public', publicRoutes);
 router.use('/push', pushRoutes);
 router.use('/notifications', notificationsRoutes);
-router.use('/system/companies', systemRoutes);
+router.use('/system', systemRoutes);
 router.use('/company', companyRoutes);
 router.use('/clients', clientsRoutes);
 router.use('/leads', leadsRoutes);
