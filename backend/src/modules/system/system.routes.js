@@ -15,5 +15,6 @@ router.get('/dashboard', asyncHandler(systemController.getSystemDashboard));
 router.post('/onboard', validate(schemas.createOnboardSchema), asyncHandler(systemController.onboardCompany));
 router.get('/companies', validate({ query: paginationSchema }), asyncHandler(systemController.listCompanies));
 router.get('/:id/details', validate(schemas.getCompanyDetailsSchema), asyncHandler(systemController.getCompanyDetails));
+router.patch('/:id', validate(schemas.updateCompanySchema), asyncHandler(systemController.updateCompany));
 
 module.exports = router;

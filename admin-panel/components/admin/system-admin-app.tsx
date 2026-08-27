@@ -13,17 +13,33 @@ import { SystemSidebar } from "./system/system-sidebar"
 import { SystemDashboard } from "./system/system-dashboard"
 import { SystemCompanies } from "./system/system-companies"
 import { SystemOnboarding } from "./system/system-onboarding"
+import { SystemCompanyDetail } from "./system/system-company-detail"
 
 export function SystemAdminApp() {
   const [authed, setAuthed] = React.useState(false)
   const [loading, setLoading] = React.useState(true)
   
   const [activeView, setActiveView] = React.useState("dashboard") // dashboard, companies, onboard, users, settings
+  const [selectedCompanyId, setSelectedCompanyId] = React.useState<string | null>(null)
+
   const [dashboardData, setDashboardData] = React.useState<any>(null)
-  const [companies, setCompanies] = React.useState<any[]>([])
   const [apiStatus, setApiStatus] = React.useState<"loading" | "online" | "error">("loading")
 
   React.useEffect(() => {
+    // Basic routing via URLSearchParams for deep linking
+    const params = new URLSearchParams(window.location.search)
+    const viewParam = params.get('view')
+    const idParam = params.get('id')
+    
+    if (viewParam) {
+      if (viewParam === 'company_detail' && idParam) {
+        setActiveView('company_detail')
+        setSelectedCompanyId(idParam)
+      } else {
+        setActiveView(viewParam)
+      }
+    }
+
     const supabase = createClient()
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session) {
@@ -39,6 +55,20 @@ export function SystemAdminApp() {
 
     return () => subscription.unsubscribe()
   }, [])
+
+  const handleNavigate = (view: string, id: string | null = null) => {
+    setActiveView(view)
+    setSelectedCompanyId(id)
+    
+    const url = new URL(window.location.href)
+    url.searchParams.set('view', view)
+    if (id) {
+      url.searchParams.set('id', id)
+    } else {
+      url.searchParams.delete('id')
+    }
+    window.history.pushState({}, '', url.toString())
+  }
 
   React.useEffect(() => {
     if (authed) {
@@ -68,12 +98,6 @@ export function SystemAdminApp() {
           const data = await res.json()
           setDashboardData(data.dashboard)
         }
-      } else if (activeView === "companies") {
-        const res = await fetchApi('/system/companies')
-        if (res.ok) {
-          const data = await res.json()
-          setCompanies(Array.isArray(data) ? data : (data.items ?? []))
-        }
       }
     } catch (err) {
       toast.error("Veriler yüklenemedi.")
@@ -98,7 +122,7 @@ export function SystemAdminApp() {
 
   return (
     <div className="flex min-h-screen bg-[#090C10] text-slate-100">
-      <SystemSidebar activeView={activeView} onNavigate={setActiveView} />
+      <SystemSidebar activeView={activeView === "company_detail" ? "companies" : activeView} onNavigate={(v) => handleNavigate(v)} />
       
       <div className="flex-1 flex flex-col min-w-0">
         <header className="h-16 flex items-center justify-between px-8 bg-[#0D1117] border-b border-white/5 sticky top-0 z-10">
@@ -107,6 +131,7 @@ export function SystemAdminApp() {
             <span className="text-slate-100">
               {activeView === "dashboard" && "Genel Bakış"}
               {activeView === "companies" && "Acenteler"}
+              {activeView === "company_detail" && "Acente Detayı"}
               {activeView === "onboard" && "Yeni Acente Onboarding"}
               {activeView === "users" && "Platform Kullanıcıları"}
               {activeView === "websites" && "Websiteleri"}
@@ -137,9 +162,14 @@ export function SystemAdminApp() {
             {activeView === "dashboard" && <SystemDashboard data={dashboardData} />}
             {activeView === "companies" && (
               <SystemCompanies 
-                companies={companies} 
-                onOnboard={() => setActiveView("onboard")}
-                onSelectCompany={(id) => toast.info(`Detail view for ${id} (God Mode) - Eklenecek`)} 
+                onOnboard={() => handleNavigate("onboard")}
+                onSelectCompany={(id) => handleNavigate("company_detail", id)} 
+              />
+            )}
+            {activeView === "company_detail" && selectedCompanyId && (
+              <SystemCompanyDetail 
+                companyId={selectedCompanyId} 
+                onBack={() => handleNavigate("companies")}
               />
             )}
             {activeView === "onboard" && <SystemOnboarding />}

@@ -12,8 +12,8 @@ async function onboardCompany(req, res, next) {
 
 async function listCompanies(req, res, next) {
   try {
-    const { page, limit } = req.validated.query;
-    const companies = await systemService.listCompanies({ context: req.context, page, limit });
+    const { page, limit, search } = req.query; // search is not in paginationSchema yet, so read from req.query directly for simplicity, or update schema
+    const companies = await systemService.listCompanies({ context: req.context, page, limit, search });
     res.json(companies);
   } catch (error) {
     next(error);
@@ -35,6 +35,17 @@ async function getCompanyDetails(req, res, next) {
   }
 }
 
+async function updateCompany(req, res, next) {
+  try {
+    const { id } = req.validated.params;
+    const data = req.validated.body;
+    const result = await systemService.updateCompany({ id, data });
+    res.json({ success: true, ...result });
+  } catch (error) {
+    next(error);
+  }
+}
+
 async function getSystemDashboard(req, res, next) {
   try {
     const dashboard = await systemService.getSystemDashboard();
@@ -48,5 +59,6 @@ module.exports = {
   onboardCompany,
   listCompanies,
   getCompanyDetails,
+  updateCompany,
   getSystemDashboard
 };

@@ -137,23 +137,56 @@ async function onboardCompany({ context, input }) {
   }
 }
 
-async function listCompanies({ page = 1, limit = 50 }) {
+async function listCompanies({ page = 1, limit = 50, search = '' }) {
   const skip = (page - 1) * limit;
+  
+  const where = {
+    isSystem: false,
+    ...(search ? {
+      OR: [
+        { name: { contains: search, mode: 'insensitive' } },
+        { domain: { contains: search, mode: 'insensitive' } },
+        { customerNo: { contains: search, mode: 'insensitive' } }
+      ]
+    } : {})
+  };
+
   const [items, total] = await Promise.all([
     prisma.company.findMany({
+      where,
       skip,
       take: Number(limit),
       orderBy: { createdAt: 'desc' },
       include: {
+        memberships: {
+          where: { role: 'OWNER', status: 'ACTIVE' },
+          include: { user: true },
+          take: 1
+        },
         _count: {
           select: { branches: true, users: true, clients: true, leads: true, policies: true }
         }
       }
     }),
-    prisma.company.count()
+    prisma.company.count({ where })
   ]);
 
-  return { items, total, page, limit };
+  // Restructure items to have owner at top level
+  const formattedItems = items.map(company => {
+    const { memberships, _count, ...rest } = company;
+    const ownerMembership = memberships[0];
+    return {
+      ...rest,
+      counts: _count,
+      owner: ownerMembership ? {
+        id: ownerMembership.user.id,
+        email: ownerMembership.user.email,
+        name: ownerMembership.user.fullName
+      } : null
+    };
+  });
+
+  return { items: formattedItems, pagination: { page: Number(page), limit: Number(limit), total, totalPages: Math.ceil(total / limit) } };
 }
 
 async function getCompanyDetails({ id }) {
@@ -172,7 +205,41 @@ async function getCompanyDetails({ id }) {
     }
   });
 
-  return { company };
+  if (!company || company.isSystem) {
+    return { company: null };
+  }
+
+  // Get recent 5 leads and policies for activity summary
+  const [recentLeads, recentPolicies] = await Promise.all([
+    prisma.lead.findMany({
+      where: { companyId: id },
+      orderBy: { createdAt: 'desc' },
+      take: 5,
+      select: { id: true, fullName: true, insuranceType: true, status: true, createdAt: true }
+    }),
+    prisma.policy.findMany({
+      where: { companyId: id },
+      orderBy: { createdAt: 'desc' },
+      take: 5,
+      select: { id: true, type: true, companyName: true, createdAt: true }
+    })
+  ]);
+
+  return { company, recentLeads, recentPolicies };
+}
+
+async function updateCompany({ id, data }) {
+  const company = await prisma.company.findUnique({ where: { id } });
+  
+  if (!company) throw new AppError('NOT_FOUND', 'Firma bulunamadı', 404);
+  if (company.isSystem) throw new AppError('FORBIDDEN', 'Sistem firması güncellenemez', 403);
+
+  const updatedCompany = await prisma.company.update({
+    where: { id },
+    data
+  });
+
+  return { company: updatedCompany };
 }
 
 async function getSystemDashboard() {

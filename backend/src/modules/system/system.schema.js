@@ -34,7 +34,21 @@ const getCompanyDetailsSchema = {
   })
 };
 
+const updateCompanySchema = {
+  params: z.object({
+    id: z.string().uuid("Geçerli bir şirket ID'si (UUID) giriniz")
+  }),
+  body: z.object({
+    name: z.string().min(2, "Şirket adı en az 2 karakter olmalıdır").optional(),
+    email: z.string().email("Geçerli bir e-posta adresi giriniz").optional().or(z.literal('')).nullable(),
+    phone: z.string().optional().nullable(),
+    address: z.string().optional().nullable(),
+    ownerName: z.string().optional().nullable(),
+  }).strict()
+};
+
 module.exports = {
   createOnboardSchema,
-  getCompanyDetailsSchema
+  getCompanyDetailsSchema,
+  updateCompanySchema
 };
