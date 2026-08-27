@@ -2,7 +2,7 @@
 
 import * as React from "react"
 import { toast } from "sonner"
-import { Check, Trash2, Inbox, Phone, Banknote, RotateCcw, Pencil, MessageCircle } from "lucide-react"
+import { Check, Trash2, Inbox, Phone, Banknote, RotateCcw, Pencil, MessageCircle, MoreVertical, Filter } from "lucide-react"
 
 import {
   Card,
@@ -35,16 +35,7 @@ import {
   EmptyTitle,
   EmptyDescription,
 } from "@/components/ui/empty"
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
 import {
   type Lead,
   type InsuranceType,
@@ -53,19 +44,19 @@ import {
   formatCurrency,
 } from "@/lib/mock-data"
 import { CopyField } from "@/components/admin/copy-field"
+import { LeadDetailSheet } from "@/components/admin/lead-detail-sheet"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 
 type Filter = "all" | "yeni" | "iletildi" | "onaylandi" | "silindi"
 
 const DESCRIPTIONS: Record<InsuranceType, string> = {
-  arac: "Web sitesi formundan düşen araç sigortası talepleri — Tramer sorgusu için plaka, TC, doğum tarihi ve tescil no'yu tek tıkla kopyalayın.",
-  kasko: "Kasko poliçesi teklif talepleri — araç ve kimlik bilgilerini kullanarak teklif hazırlayın.",
-  trafik: "Trafik poliçesi teklif talepleri — plaka, TC ve belge no ile hızlıca sorgulama yapın.",
-  dask: "Zorunlu deprem sigortası (DASK) teklif talepleri — kimlik ve adres bilgilerini kopyalayarak sorgulayın.",
-  saglik:
-    "Sağlık sigortası teklif talepleri — TC ve doğum tarihi ile risk sorgusu yapın.",
-  konut:
-    "Konut ve eşya sigortası teklif talepleri — kimlik ve adres bilgilerini kopyalayarak teklif hazırlayın.",
-  is_yeri: "İş yeri sigortası teklif talepleri — vergi numarası ve faaliyet alanı ile teklif çalışın."
+  arac: "Araç sigortası talepleri — Tramer sorgusu için plaka, TC, doğum tarihi ve tescil no.",
+  kasko: "Kasko poliçesi teklif talepleri — araç ve kimlik bilgileri.",
+  trafik: "Trafik poliçesi teklif talepleri — plaka, TC ve belge no.",
+  dask: "Zorunlu deprem sigortası (DASK) teklif talepleri — kimlik ve adres bilgileri.",
+  saglik: "Sağlık sigortası teklif talepleri — TC ve doğum tarihi ile risk sorgusu.",
+  konut: "Konut ve eşya sigortası teklif talepleri — kimlik ve adres bilgileri.",
+  is_yeri: "İş yeri sigortası teklif talepleri — vergi numarası ve faaliyet alanı."
 }
 
 export function LeadsView({
@@ -75,23 +66,17 @@ export function LeadsView({
   onUpdateLead,
   onDelete,
   onRestore,
+  onSelectLead,
 }: {
   companyName?: string
   insuranceType: InsuranceType
   leads: Lead[]
-  onUpdateLead: (id: string, status: "iletildi" | "onaylandi", premium?: number | null, commission?: number | null) => void
-  onDelete: (id: string) => void
-  onRestore: (id: string) => void
+  onUpdateLead: (id: string, status: "iletildi" | "onaylandi" | "silindi", premium?: number | null, commission?: number | null) => Promise<void>
+  onDelete: (id: string) => Promise<void>
+  onRestore: (id: string) => Promise<void>
+  onSelectLead: (id: string) => void
 }) {
   const [filter, setFilter] = React.useState<Filter>("all")
-  const [modal, setModal] = React.useState<{
-    open: boolean
-    leadId: string | null
-    type: "iletildi" | "onaylandi"
-  }>({ open: false, leadId: null, type: "onaylandi" })
-
-  const [premium, setPremium] = React.useState("")
-  const [commission, setCommission] = React.useState("")
 
   const scoped = leads.filter((l) => l.insuranceType === insuranceType)
   const filtered = scoped.filter((l) =>
@@ -103,344 +88,181 @@ export function LeadsView({
   const newCount = scoped.filter((l) => l.status === "yeni").length
   const sentCount = scoped.filter((l) => l.status === "iletildi").length
   const approvedCount = scoped.filter((l) => l.status === "onaylandi").length
-
   const deletedCount = scoped.filter((l) => l.status === "silindi").length
 
-  const showPlate = ["arac", "kasko", "trafik"].includes(insuranceType)
-  const showRegistration = ["arac", "kasko", "trafik"].includes(insuranceType)
-  const showAddress = ["dask", "konut", "is_yeri"].includes(insuranceType)
-
-  const openModal = (lead: Lead, type: "iletildi" | "onaylandi") => {
-    setModal({ open: true, leadId: lead.id, type })
-    setPremium(lead.premium ? String(lead.premium) : "")
-    setCommission(lead.commission ? String(lead.commission) : "")
-  }
-
-  const handleSave = () => {
-    if (!modal.leadId) return
-    onUpdateLead(
-      modal.leadId,
-      modal.type,
-      premium ? parseFloat(premium) : null,
-      commission ? parseFloat(commission) : null
-    )
-    setModal({ open: false, leadId: null, type: "onaylandi" })
-  }
-
-  const handleWhatsApp = (lead: Lead) => {
-    if (!lead.phone) {
-      toast.error("Müşteri telefon numarası bulunamadı.");
-      return;
-    }
-    if (!lead.premium) {
-      toast.error("Lütfen önce bir teklif tutarı (prim) giriniz.");
-      return;
-    }
-
-    let normalizedPhone = lead.phone.replace(/[\s\-\(\)\+]/g, '');
-    if (normalizedPhone.startsWith('0')) {
-      normalizedPhone = '90' + normalizedPhone.slice(1);
-    } else if (!normalizedPhone.startsWith('90')) {
-      normalizedPhone = '90' + normalizedPhone;
-    }
-
-    const formattedAmount = formatCurrency(lead.premium);
-    const message = `Merhaba ${lead.name},\n\n${companyName} tarafından hazırlanan ${label} teklifiniz ${formattedAmount}'dir.\n\nBu tutarı onaylıyor musunuz?\n\nEVET / HAYIR`;
-    const encodedMessage = encodeURIComponent(message);
-    
-    window.open(`https://wa.me/${normalizedPhone}?text=${encodedMessage}`, '_blank');
-    toast.success("Mesaj WhatsApp'ta hazırlandı.");
-  }
-
-
   return (
-    <Card className="overflow-hidden">
-      <CardHeader>
-        <CardTitle>{label} Talepleri</CardTitle>
-        <CardDescription>{DESCRIPTIONS[insuranceType]}</CardDescription>
-        <CardAction>
-          <Tabs value={filter} onValueChange={(v) => setFilter(v as Filter)}>
-            <TabsList>
-              <TabsTrigger value="all">Tümü ({scoped.length})</TabsTrigger>
-              <TabsTrigger value="yeni">Yeni ({newCount})</TabsTrigger>
-              <TabsTrigger value="iletildi">İletildi ({sentCount})</TabsTrigger>
-              <TabsTrigger value="onaylandi">Onaylanan ({approvedCount})</TabsTrigger>
-              <TabsTrigger value="silindi">Silinenler ({deletedCount})</TabsTrigger>
-            </TabsList>
-          </Tabs>
-        </CardAction>
-      </CardHeader>
-      <CardContent className="px-0">
-        {filtered.length === 0 ? (
-          <Empty className="py-10">
-            <EmptyHeader>
-              <EmptyMedia variant="icon">
-                <Inbox />
-              </EmptyMedia>
-              <EmptyTitle>Kayıt yok</EmptyTitle>
-              <EmptyDescription>
-                Bu filtreye uygun talep bulunmuyor.
-              </EmptyDescription>
-            </EmptyHeader>
-          </Empty>
-        ) : (
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow className="hover:bg-transparent">
-                  <TableHead className="pl-4">Tarih</TableHead>
-                  <TableHead>Ad Soyad</TableHead>
-                  {showPlate && <TableHead>Plaka</TableHead>}
-                  <TableHead>TC Kimlik No</TableHead>
-                  <TableHead>Doğum Tarihi</TableHead>
-                  {showRegistration && (
-                    <TableHead>Belge / Tescil</TableHead>
-                  )}
-                  {showAddress && <TableHead>Adres</TableHead>}
-                  <TableHead>Telefon</TableHead>
-                  <TableHead>Finans (P/K)</TableHead>
-                  <TableHead>Durum</TableHead>
-                  <TableHead className="pr-4 text-right">İşlemler</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
+    <>
+      <Card className="overflow-hidden border-none sm:border-solid shadow-none sm:shadow-sm">
+        <CardHeader className="px-0 sm:px-6">
+          <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4">
+            <div>
+              <CardTitle>{label} Talepleri</CardTitle>
+              <CardDescription className="hidden sm:block">{DESCRIPTIONS[insuranceType]}</CardDescription>
+            </div>
+            
+            {/* Desktop Tabs */}
+            <div className="hidden lg:block">
+              <Tabs value={filter} onValueChange={(v) => setFilter(v as Filter)}>
+                <TabsList>
+                  <TabsTrigger value="all">Tümü ({scoped.length})</TabsTrigger>
+                  <TabsTrigger value="yeni">Yeni ({newCount})</TabsTrigger>
+                  <TabsTrigger value="iletildi">İletildi ({sentCount})</TabsTrigger>
+                  <TabsTrigger value="onaylandi">Onaylanan ({approvedCount})</TabsTrigger>
+                  <TabsTrigger value="silindi">Silinenler ({deletedCount})</TabsTrigger>
+                </TabsList>
+              </Tabs>
+            </div>
+            
+            {/* Mobile / Tablet Filter Dropdown */}
+            <div className="lg:hidden flex">
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" className="w-full justify-between">
+                    <span>
+                      Filtre: {filter === "all" ? "Tümü" : 
+                             filter === "yeni" ? "Yeni" : 
+                             filter === "iletildi" ? "İletildi" : 
+                             filter === "onaylandi" ? "Onaylandı" : "Silinenler"}
+                    </span>
+                    <Filter className="size-4 ml-2 opacity-50" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent className="w-[200px]" align="start">
+                  <DropdownMenuItem onClick={() => setFilter("all")}>Tümü ({scoped.length})</DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setFilter("yeni")}>Yeni ({newCount})</DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setFilter("iletildi")}>İletildi ({sentCount})</DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setFilter("onaylandi")}>Onaylanan ({approvedCount})</DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setFilter("silindi")}>Silinenler ({deletedCount})</DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="px-0 sm:px-6">
+          {filtered.length === 0 ? (
+            <Empty className="py-10">
+              <EmptyHeader>
+                <EmptyMedia variant="icon">
+                  <Inbox />
+                </EmptyMedia>
+                <EmptyTitle>Kayıt yok</EmptyTitle>
+                <EmptyDescription>
+                  Bu filtreye uygun talep bulunmuyor.
+                </EmptyDescription>
+              </EmptyHeader>
+            </Empty>
+          ) : (
+            <>
+              {/* MOBILE CARD VIEW */}
+              <div className="md:hidden flex flex-col gap-3 pb-safe">
                 {filtered.map((lead) => (
-                  <TableRow key={lead.id}>
-                    <TableCell className="pl-4 text-muted-foreground tabular-nums">
-                      {formatDate(lead.date)}
-                    </TableCell>
-                    <TableCell>
+                  <div 
+                    key={lead.id} 
+                    className="flex flex-col bg-card border rounded-xl overflow-hidden shadow-sm active:scale-[0.99] transition-transform"
+                    onClick={() => onSelectLead(lead.id)}
+                  >
+                    <div className="flex justify-between p-4 pb-3">
+                      <div className="flex flex-col gap-0.5">
+                        <div className="font-semibold text-base">{lead.name}</div>
+                        <div className="text-xs text-muted-foreground uppercase tracking-wider font-medium">{lead.insuranceType}</div>
+                      </div>
+                      <div>
+                        {lead.status === "yeni" && <Badge variant="default">YENİ</Badge>}
+                        {lead.status === "iletildi" && <Badge variant="secondary">İLETİLDİ</Badge>}
+                        {lead.status === "onaylandi" && <Badge variant="outline" className="border-success text-success bg-success/10">ONAYLANDI</Badge>}
+                        {lead.status === "silindi" && <Badge variant="outline" className="border-muted-foreground text-muted-foreground bg-muted">SİLİNDİ</Badge>}
+                      </div>
+                    </div>
+                    
+                    <div className="px-4 py-2 bg-muted/40 flex justify-between items-center text-sm">
+                      <div className="flex items-center gap-1.5 text-foreground font-medium">
+                        <Phone className="size-3.5 text-muted-foreground" /> {lead.phone}
+                      </div>
+                      <div className="text-muted-foreground truncate max-w-[120px]">
+                        {lead.city || lead.address || "Şehir bilinmiyor"}
+                      </div>
+                    </div>
+                    
+                    <div className="px-4 py-3 flex justify-between items-center bg-card">
                       <div className="flex flex-col">
-                        <span className="font-medium">{lead.name}</span>
-                        <span className="max-w-52 truncate text-xs text-muted-foreground">
-                          {lead.note}
+                        <span className="text-[10px] uppercase text-muted-foreground font-semibold mb-0.5">Teklif Tutarı</span>
+                        <span className="font-medium text-sm">
+                          {lead.premium ? formatCurrency(lead.premium) : "Henüz verilmedi"}
                         </span>
                       </div>
-                    </TableCell>
-                    {showPlate && (
-                      <TableCell>
-                        {lead.plate ? (
-                          <CopyField value={lead.plate} label="Plaka" />
-                        ) : (
-                          <span className="text-muted-foreground">—</span>
-                        )}
-                      </TableCell>
-                    )}
-                    <TableCell>
-                      <CopyField value={lead.tc} label="TC Kimlik No" />
-                    </TableCell>
-                    <TableCell>
-                      <CopyField value={lead.birthDate} label="Doğum Tarihi" />
-                    </TableCell>
-                    {showRegistration && (
-                      <TableCell>
-                        {lead.registrationNo ? (
-                          <CopyField
-                            value={lead.registrationNo}
-                            label="Belge / Tescil Numarası"
-                          />
-                        ) : (
-                          <span className="text-muted-foreground">—</span>
-                        )}
-                      </TableCell>
-                    )}
-                    {showAddress && (
-                      <TableCell className="max-w-56">
-                        <span className="block truncate text-sm text-muted-foreground">
-                          {lead.address ?? "—"}
-                        </span>
-                      </TableCell>
-                    )}
-                    <TableCell>
-                      <span className="inline-flex items-center gap-1.5 text-sm whitespace-nowrap">
-                        <Phone className="size-3 text-muted-foreground" />
-                        {lead.phone}
-                      </span>
-                    </TableCell>
-                    <TableCell>
-                      {lead.premium || lead.commission ? (
-                        <div className="flex flex-col text-xs">
-                          <span className="font-medium">{formatCurrency(lead.premium || 0)}</span>
-                          <span className="text-success">{formatCurrency(lead.commission || 0)}</span>
-                        </div>
-                      ) : (
-                        <span className="text-muted-foreground">—</span>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      {lead.status === "yeni" && <Badge variant="default">Yeni</Badge>}
-                      {lead.status === "iletildi" && <Badge variant="secondary">İletildi</Badge>}
-                      {lead.status === "onaylandi" && <Badge variant="outline" className="border-success text-success bg-success/10">Onaylandı</Badge>}
-                      {lead.status === "silindi" && <Badge variant="outline" className="border-muted-foreground text-muted-foreground bg-muted">Silindi</Badge>}
-                    </TableCell>
-                    <TableCell className="pr-4">
-                      <div className="flex items-center justify-end gap-1">
-                        {lead.status === "silindi" ? (
-                          <Tooltip>
-                            <TooltipTrigger
-                              render={
-                                <Button
-                                  variant="ghost"
-                                  size="icon-sm"
-                                  onClick={() => onRestore(lead.id)}
-                                  aria-label="Geri Al"
-                                  className="text-primary hover:text-primary hover:bg-primary/10"
-                                />
-                              }
-                            >
-                              <RotateCcw className="size-4" />
-                            </TooltipTrigger>
-                            <TooltipContent>Talebi geri al</TooltipContent>
-                          </Tooltip>
-                        ) : (
-                          <>
-                            {lead.status !== "onaylandi" ? (
-                              <Tooltip>
-                                <TooltipTrigger
-                                  render={
-                                    <Button
-                                      variant="ghost"
-                                      size="icon-sm"
-                                      onClick={() => openModal(lead, "onaylandi")}
-                                      aria-label="Satışa Çevir"
-                                      className="text-success hover:text-success hover:bg-success/10"
-                                    />
-                                  }
-                                >
-                                  <Banknote className="size-4" />
-                                </TooltipTrigger>
-                                <TooltipContent>Satışa çevir / Onayla</TooltipContent>
-                              </Tooltip>
-                            ) : (
-                              <Tooltip>
-                                <TooltipTrigger
-                                  render={
-                                    <Button
-                                      variant="ghost"
-                                      size="icon-sm"
-                                      onClick={() => openModal(lead, "onaylandi")}
-                                      aria-label="Düzenle"
-                                      className="text-muted-foreground hover:text-foreground"
-                                    />
-                                  }
-                                >
-                                  <Pencil className="size-4" />
-                                </TooltipTrigger>
-                                <TooltipContent>Satış bilgilerini düzenle</TooltipContent>
-                              </Tooltip>
-                            )}
-
-                            {lead.status === "yeni" && (
-                              <Tooltip>
-                                <TooltipTrigger
-                                  render={
-                                    <Button
-                                      variant="ghost"
-                                      size="icon-sm"
-                                      onClick={() => openModal(lead, "iletildi")}
-                                      aria-label="Teklif İletildi"
-                                      className="text-primary hover:text-primary hover:bg-primary/10"
-                                    />
-                                  }
-                                >
-                                  <Check className="size-4" />
-                                </TooltipTrigger>
-                                <TooltipContent>Müşteriye teklif iletildi olarak işaretle</TooltipContent>
-                              </Tooltip>
-                            )}
-
-                            <Tooltip>
-                              <TooltipTrigger
-                                render={
-                                  <Button
-                                    variant="ghost"
-                                    size="icon-sm"
-                                    disabled={!lead.phone}
-                                    onClick={() => handleWhatsApp(lead)}
-                                    aria-label="WhatsApp İle İlet"
-                                    className="text-[#25D366] hover:text-[#25D366] hover:bg-[#25D366]/10 disabled:opacity-50"
-                                  />
-                                }
-                              >
-                                <MessageCircle className="size-4" />
-                              </TooltipTrigger>
-                              <TooltipContent>
-                                {!lead.phone ? "Müşteri telefon numarası bulunamadı." : "WhatsApp üzerinden teklifi ilet"}
-                              </TooltipContent>
-                            </Tooltip>
-
-                            <Tooltip>
-                              <TooltipTrigger
-                                render={
-                                  <Button
-                                    variant="ghost"
-                                    size="icon-sm"
-                                    onClick={() => onDelete(lead.id)}
-                                    aria-label="Sil"
-                                    className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                                  />
-                                }
-                              >
-                                <Trash2 className="size-4" />
-                              </TooltipTrigger>
-                              <TooltipContent>Talebi sil</TooltipContent>
-                            </Tooltip>
-                          </>
-                        )}
-                      </div>
-                    </TableCell>
-                  </TableRow>
+                      <Button size="sm" variant="secondary" className="px-5 font-medium rounded-full h-8">
+                        Talebi İncele
+                      </Button>
+                    </div>
+                  </div>
                 ))}
-              </TableBody>
-            </Table>
-          </div>
-        )}
-      </CardContent>
+              </div>
 
-      <Dialog open={modal.open} onOpenChange={(open) => !open && setModal({ open: false, leadId: null, type: "onaylandi" })}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>
-              {modal.type === "onaylandi" ? "Satışı Onayla" : "Teklif İletildi"}
-            </DialogTitle>
-            <DialogDescription>
-              {modal.type === "onaylandi" 
-                ? "Poliçe satışı gerçekleşti. Kazanılan net komisyonu ve prim tutarını girin." 
-                : "Müşteriye teklif iletildi. Finansal analizler için beklenen (tahmini) poliçe tutarını ve komisyonu girebilirsiniz (opsiyonel)."}
-            </DialogDescription>
-          </DialogHeader>
-          <div className="grid gap-4 py-4">
-            <div className="grid gap-2">
-              <Label htmlFor="premium">Poliçe Tutarı (Prim) - TL</Label>
-              <Input
-                id="premium"
-                type="number"
-                placeholder="Örn: 15000"
-                value={premium}
-                onChange={(e) => setPremium(e.target.value)}
-              />
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="commission">Acente Komisyonu - TL</Label>
-              <Input
-                id="commission"
-                type="number"
-                placeholder="Örn: 2250"
-                value={commission}
-                onChange={(e) => setCommission(e.target.value)}
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setModal({ open: false, leadId: null, type: "onaylandi" })}>
-              İptal
-            </Button>
-            <Button onClick={handleSave}>
-              Kaydet
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </Card>
+              {/* DESKTOP TABLE VIEW */}
+              <div className="hidden md:block overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="hover:bg-transparent">
+                      <TableHead className="w-[110px]">Tarih</TableHead>
+                      <TableHead>Müşteri</TableHead>
+                      <TableHead>Telefon</TableHead>
+                      <TableHead>Şehir</TableHead>
+                      <TableHead>Teklif (Pr/Km)</TableHead>
+                      <TableHead>Durum</TableHead>
+                      <TableHead className="text-right">İşlemler</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filtered.map((lead) => (
+                      <TableRow key={lead.id} className="cursor-pointer group" onClick={() => onSelectLead(lead.id)}>
+                        <TableCell className="text-muted-foreground tabular-nums text-xs">
+                          {formatDate(lead.date)}
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex flex-col">
+                            <span className="font-medium">{lead.name}</span>
+                            {lead.tc && lead.tc !== "—" && (
+                               <span className="text-[11px] text-muted-foreground font-mono">TC: {lead.tc}</span>
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <span className="inline-flex items-center gap-1.5 text-sm whitespace-nowrap">
+                            <Phone className="size-3 text-muted-foreground" />
+                            {lead.phone}
+                          </span>
+                        </TableCell>
+                        <TableCell>
+                          <span className="text-sm text-muted-foreground">{lead.city || "—"}</span>
+                        </TableCell>
+                        <TableCell>
+                          {lead.premium || lead.commission ? (
+                            <div className="flex flex-col text-xs">
+                              <span className="font-medium">{formatCurrency(lead.premium || 0)}</span>
+                              {lead.commission ? <span className="text-success">{formatCurrency(lead.commission)}</span> : null}
+                            </div>
+                          ) : (
+                            <span className="text-muted-foreground">—</span>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          {lead.status === "yeni" && <Badge variant="default">Yeni</Badge>}
+                          {lead.status === "iletildi" && <Badge variant="secondary">İletildi</Badge>}
+                          {lead.status === "onaylandi" && <Badge variant="outline" className="border-success text-success bg-success/10">Onaylandı</Badge>}
+                          {lead.status === "silindi" && <Badge variant="outline" className="border-muted-foreground text-muted-foreground bg-muted">Silindi</Badge>}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Button size="sm" variant="ghost" className="opacity-0 group-hover:opacity-100 transition-opacity">İncele</Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </>
+          )}
+        </CardContent>
+      </Card>
+    </>
   )
 }

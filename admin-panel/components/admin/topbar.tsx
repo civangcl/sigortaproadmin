@@ -1,25 +1,17 @@
 "use client"
 
-import { Menu, Search, Bell, Settings, Info } from "lucide-react"
+import { Menu, Search, Bell, Settings, Info, X } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuGroup,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
 import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip"
 import { ScrollArea } from "@/components/ui/scroll-area"
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet"
 import { type Client, type Lead, daysUntilExpiry } from "@/lib/mock-data"
 import type { ViewId } from "@/components/admin/admin-app"
 import { usePushNotifications } from "@/hooks/use-push-notifications"
@@ -106,6 +98,7 @@ export function Topbar({
   const { isSupported, isSubscribed, subscribe, permission } = usePushNotifications()
   const [isIOS, setIsIOS] = React.useState(false)
   const [isStandalone, setIsStandalone] = React.useState(true)
+  const [sheetOpen, setSheetOpen] = React.useState(false)
 
   React.useEffect(() => {
     if (typeof window !== "undefined") {
@@ -129,6 +122,13 @@ export function Topbar({
       return
     }
     await subscribe()
+  }
+
+  const handleNotificationSelect = (n: any) => {
+    setSheetOpen(false)
+    if (onNotificationClick) {
+      onNotificationClick(n)
+    }
   }
 
   const notificationCount = dbNotifications.length
@@ -157,7 +157,9 @@ export function Topbar({
       <div className="ml-auto flex items-center gap-2">
         {isIOS && !isStandalone && (
           <Tooltip>
-            <TooltipTrigger render={<Button variant="outline" size="icon-sm" onClick={handleSubscribe} className="text-primary hover:text-primary"><Info className="size-4" /></Button>} />
+            <TooltipTrigger asChild>
+               <Button variant="outline" size="icon-sm" onClick={handleSubscribe} className="text-primary hover:text-primary hidden sm:flex"><Info className="size-4" /></Button>
+            </TooltipTrigger>
             <TooltipContent>iPhone'da bildirimleri açmak için tıklayın</TooltipContent>
           </Tooltip>
         )}
@@ -171,51 +173,51 @@ export function Topbar({
           />
         </div>
 
-        <DropdownMenu>
+        <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
           <div className="relative">
-            <DropdownMenuTrigger render={<Button variant="outline" size="icon-sm" aria-label="Bildirimler" />}>
-              <Bell />
-            </DropdownMenuTrigger>
+            <SheetTrigger asChild>
+              <Button variant="outline" size="icon-sm" aria-label="Bildirimler">
+                <Bell />
+              </Button>
+            </SheetTrigger>
             {notificationCount > 0 && (
               <Badge className="absolute -top-1.5 -right-1.5 size-4 rounded-full p-0 text-[10px] tabular-nums pointer-events-none">
                 {notificationCount}
               </Badge>
             )}
           </div>
-          <DropdownMenuContent align="end" className="w-80">
-            <div className="flex items-center justify-between px-3 py-2">
-              <span className="text-sm font-semibold">Bildirimler</span>
+          <SheetContent side="right" className="w-full !max-w-full sm:!max-w-sm p-0 flex flex-col">
+            <SheetHeader className="px-4 py-4 border-b shrink-0 flex flex-row items-center justify-between">
+              <SheetTitle className="text-base m-0 text-left">Bildirimler</SheetTitle>
               {isSupported && !isSubscribed && (
                 <Button variant="secondary" size="sm" className="h-7 text-xs" onClick={handleSubscribe}>
-                  Bildirimleri Aç
+                  Aç
                 </Button>
               )}
-            </div>
-            <DropdownMenuSeparator />
-            <ScrollArea className="h-max max-h-[60vh]">
+            </SheetHeader>
+            <ScrollArea className="flex-1">
               {notificationCount === 0 ? (
-                <div className="p-4 text-center text-sm text-muted-foreground">
+                <div className="p-8 text-center text-sm text-muted-foreground">
                   Şu an için yeni bir bildiriminiz yok.
                 </div>
               ) : (
-                <DropdownMenuGroup>
-                  <DropdownMenuLabel className="text-xs font-normal text-muted-foreground px-2">Yeni Bildirimler</DropdownMenuLabel>
+                <div className="flex flex-col">
                   {dbNotifications.map(n => (
-                    <DropdownMenuItem 
+                    <div 
                       key={n.id} 
-                      className="flex flex-col items-start gap-1 p-3 cursor-pointer"
-                      onClick={() => onNotificationClick?.(n)}
+                      className="flex flex-col items-start gap-1 p-4 border-b border-border/50 cursor-pointer hover:bg-muted/50 transition-colors active:bg-muted"
+                      onClick={() => handleNotificationSelect(n)}
                     >
-                      <span className="font-medium text-sm">{n.title}</span>
-                      <span className="text-xs text-muted-foreground truncate w-full whitespace-normal">{n.body}</span>
-                      <span className="text-[10px] text-muted-foreground/60">{new Date(n.createdAt).toLocaleTimeString("tr-TR", { hour: '2-digit', minute: '2-digit' })}</span>
-                    </DropdownMenuItem>
+                      <span className="font-medium text-sm text-foreground">{n.title}</span>
+                      <span className="text-xs text-muted-foreground break-words w-full">{n.body}</span>
+                      <span className="text-[10px] text-muted-foreground/60 mt-1">{new Date(n.createdAt).toLocaleTimeString("tr-TR", { hour: '2-digit', minute: '2-digit' })}</span>
+                    </div>
                   ))}
-                </DropdownMenuGroup>
+                </div>
               )}
             </ScrollArea>
-          </DropdownMenuContent>
-        </DropdownMenu>
+          </SheetContent>
+        </Sheet>
 
         <span className="hidden text-xs text-muted-foreground xl:block">
           {today}

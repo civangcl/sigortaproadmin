@@ -384,6 +384,7 @@ export function AdminApp() {
                 onUpdateLead={handleUpdateLead}
                 onDelete={handleDeleteLead}
                 onRestore={handleRestoreLead}
+                onSelectLead={setSelectedLeadId}
               />
             )}
             {view === "clients" && (
@@ -420,6 +421,9 @@ export function AdminApp() {
         onOpenChange={(open) => {
           if (!open) setSelectedLeadId(null)
         }}
+        onUpdateLead={handleUpdateLead}
+        onDeleteLead={handleDeleteLead}
+        onAddClient={handleAddClient}
       />
     </div>
   )

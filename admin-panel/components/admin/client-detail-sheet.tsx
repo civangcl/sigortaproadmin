@@ -193,7 +193,7 @@ export function ClientDetailSheet({
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent
         side="right"
-        className="w-full gap-0 p-0 sm:max-w-md"
+        className="w-full !max-w-full sm:!max-w-md gap-0 p-0 flex flex-col"
       >
         {client && (
           <>

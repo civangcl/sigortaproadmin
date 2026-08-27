@@ -202,26 +202,28 @@ export function FinancialView({
               {expensesList.length === 0 ? (
                 <div className="text-center py-10 text-muted-foreground">Kayıtlı gider bulunmuyor.</div>
               ) : (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Tarih</TableHead>
-                      <TableHead>Açıklama</TableHead>
-                      <TableHead className="text-right">Tutar</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {expensesList.map(exp => (
-                      <TableRow key={exp.id}>
-                        <TableCell>{new Date(exp.date).toLocaleDateString("tr-TR")}</TableCell>
-                        <TableCell>{exp.description}</TableCell>
-                        <TableCell className="text-right font-medium text-destructive">
-                          -{formatCurrency(exp.amount)}
-                        </TableCell>
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Tarih</TableHead>
+                        <TableHead>Açıklama</TableHead>
+                        <TableHead className="text-right">Tutar</TableHead>
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+                    </TableHeader>
+                    <TableBody>
+                      {expensesList.map(exp => (
+                        <TableRow key={exp.id}>
+                          <TableCell className="whitespace-nowrap">{new Date(exp.date).toLocaleDateString("tr-TR")}</TableCell>
+                          <TableCell className="min-w-[120px]">{exp.description}</TableCell>
+                          <TableCell className="text-right font-medium text-destructive whitespace-nowrap">
+                            -{formatCurrency(exp.amount)}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
               )}
             </CardContent>
           </Card>
