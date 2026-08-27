@@ -56,12 +56,23 @@ router.post('/firat-ece/lead', validate(leadSchema), async (req, res) => {
     const companyId = process.env.FIRAT_ECE_COMPANY_ID || 'f74c889c-1887-40fc-8710-3630bccff59d';
     const data = req.validatedBody;
 
+    // Resolve default branch for the company
+    const defaultBranch = await prisma.branch.findFirst({
+      where: {
+        companyId,
+        isDefault: true,
+        isActive: true
+      }
+    });
+    const branchId = defaultBranch ? defaultBranch.id : undefined;
+
     const inputType = (data.insuranceType || '').toLowerCase();
     const insuranceType = inputType === 'dask' || inputType === 'konut' ? 'dask' : 'arac';
 
     const lead = await prisma.lead.create({
       data: {
         companyId,
+        branchId,
         insuranceType,
         fullName: data.fullName,
         tcKimlikNo: data.tcIdentity,

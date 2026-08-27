@@ -204,17 +204,11 @@ export function AdminApp() {
   }
 
   async function handleUpdateLead(id: string, status: "iletildi" | "onaylandi", premium?: number | null, commission?: number | null) {
-    // Optimistic UI update
+    const oldStatus = leads.find(l => l.id === id)?.status || "yeni"
+    
+    // Optimistic UI update for status only
     setLeads((prev) =>
-      prev.map((l) => {
-        if (l.id === id) {
-          const updated = { ...l, status }
-          if (premium !== undefined) updated.premium = premium === null ? undefined : premium
-          if (commission !== undefined) updated.commission = commission === null ? undefined : commission
-          return updated
-        }
-        return l
-      })
+      prev.map((l) => (l.id === id ? { ...l, status } : l))
     )
     
     // Server Action call
@@ -222,8 +216,24 @@ export function AdminApp() {
     const res = await updateLeadFinancials(id, { status, premium, commission })
     if (res.success) {
       toast.success(status === "onaylandi" ? "Satış onaylandı!" : "Teklif iletildi.")
+      // Update financial values safely after DB persistence
+      if (premium !== undefined || commission !== undefined) {
+        setLeads((prev) =>
+          prev.map((l) => {
+            if (l.id === id) {
+              const updated = { ...l }
+              if (premium !== undefined) updated.premium = premium === null ? undefined : premium
+              if (commission !== undefined) updated.commission = commission === null ? undefined : commission
+              return updated
+            }
+            return l
+          })
+        )
+      }
     } else {
       toast.error(res.error || "Hata oluştu.")
+      // rollback status on error
+      setLeads((prev) => prev.map((l) => (l.id === id ? { ...l, status: oldStatus } : l)))
     }
   }
 

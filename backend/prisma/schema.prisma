@@ -171,8 +171,8 @@ model Lead {
   engineNo       String?
   chassisNo      String?
   status         String   @default("yeni") // "yeni", "iletildi", "onaylandi"
-  premium        Float?   // Poliçe tutarı / Teklif tutarı
-  commission     Float?   // Acente komisyonu / Beklenen komisyon
+  premium        Decimal? @db.Decimal(12,2) // Poliçe tutarı / Teklif tutarı
+  commission     Decimal? @db.Decimal(12,2) // Acente komisyonu / Beklenen komisyon
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 

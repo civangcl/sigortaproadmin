@@ -50,8 +50,8 @@ async function listLeads({ context, page, limit }) {
     year: lead.year || undefined,
     engineNo: lead.engineNo || undefined,
     chassisNo: lead.chassisNo || undefined,
-    premium: lead.premium || undefined,
-    commission: lead.commission || undefined,
+    premium: lead.premium ? parseFloat(lead.premium.toString()) : undefined,
+    commission: lead.commission ? parseFloat(lead.commission.toString()) : undefined,
   }));
   
   return formatPaginatedResponse(formattedItems, total, page, limit);
@@ -80,8 +80,8 @@ async function updateLeadStatus({ context, id, input }) {
 
     // 4. Handle side effects of approval atomically
     if (status === 'onaylandi') {
-      const p = premium || lead.premium || 0;
-      const c = commission || lead.commission || 0;
+      const p = premium !== undefined ? premium : (lead.premium ? parseFloat(lead.premium.toString()) : 0);
+      const c = commission !== undefined ? commission : (lead.commission ? parseFloat(lead.commission.toString()) : 0);
       
       // Create Client using the repository with the transaction
       const client = await clientsRepository.createForTenant(companyId, {
