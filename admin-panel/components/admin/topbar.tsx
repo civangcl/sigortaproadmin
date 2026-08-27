@@ -43,6 +43,14 @@ const TITLES: Record<ViewId, { title: string; subtitle: string }> = {
     title: "DASK Talepleri",
     subtitle: "Zorunlu deprem sigortası teklif talepleri",
   },
+  "leads-kasko": {
+    title: "Kasko Talepleri",
+    subtitle: "Kasko poliçesi teklif talepleri",
+  },
+  "leads-trafik": {
+    title: "Trafik Sigortası Talepleri",
+    subtitle: "Zorunlu trafik sigortası teklif talepleri",
+  },
   "leads-saglik": {
     title: "Sağlık Sigortası Talepleri",
     subtitle: "Sağlık sigortası teklif talepleri",
@@ -50,6 +58,10 @@ const TITLES: Record<ViewId, { title: string; subtitle: string }> = {
   "leads-konut": {
     title: "Konut Sigortası Talepleri",
     subtitle: "Konut ve eşya sigortası teklif talepleri",
+  },
+  "leads-is_yeri": {
+    title: "İş Yeri Sigortası Talepleri",
+    subtitle: "İş yeri sigortası teklif talepleri",
   },
   clients: {
     title: "Müşterilerim",

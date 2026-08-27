@@ -15,8 +15,10 @@ import {
   Building2,
   PieChart,
   MessageSquare,
-
   Settings,
+  Shield,
+  AlertTriangle,
+  Briefcase,
 } from "lucide-react"
 
 import { cn } from "@/lib/utils"
@@ -33,6 +35,14 @@ const LEAD_ICONS: Record<InsuranceType, React.ComponentType<{ className?: string
   dask: Building2,
   saglik: HeartPulse,
   konut: Home,
+  kasko: Shield,
+  trafik: AlertTriangle,
+  is_yeri: Briefcase,
+}
+
+/** Safe icon getter — returns Shield fallback for unknown types to prevent React #130 */
+function getLeadIcon(type: InsuranceType): React.ComponentType<{ className?: string }> {
+  return LEAD_ICONS[type] ?? Shield
 }
 
 interface SidebarProps {
@@ -162,7 +172,7 @@ function SidebarContent({
             {INSURANCE_TYPES.map((t) => {
               const id = `leads-${t.id}` as ViewId
               const active = activeView === id
-              const Icon = LEAD_ICONS[t.id]
+              const Icon = getLeadIcon(t.id)
               const count = newCountFor(t.id)
               return (
                 <button
