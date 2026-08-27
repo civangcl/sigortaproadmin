@@ -186,13 +186,14 @@ async function getSystemDashboard() {
     recentCompanies,
     last7DaysLeads
   ] = await Promise.all([
-    prisma.company.count(),
+    prisma.company.count({ where: { isSystem: false } }),
     prisma.user.count(),
     prisma.client.count(),
     prisma.lead.count(),
     prisma.policy.count(),
     prisma.lead.count({ where: { status: 'yeni' } }),
     prisma.company.findMany({
+      where: { isSystem: false },
       take: 5,
       orderBy: { createdAt: 'desc' },
       select: { id: true, name: true, domain: true, customerNo: true, createdAt: true }

@@ -21,6 +21,7 @@ export function SystemAdminApp() {
   const [activeView, setActiveView] = React.useState("dashboard") // dashboard, companies, onboard, users, settings
   const [dashboardData, setDashboardData] = React.useState<any>(null)
   const [companies, setCompanies] = React.useState<any[]>([])
+  const [apiStatus, setApiStatus] = React.useState<"loading" | "online" | "error">("loading")
 
   React.useEffect(() => {
     const supabase = createClient()
@@ -42,8 +43,22 @@ export function SystemAdminApp() {
   React.useEffect(() => {
     if (authed) {
       loadData()
+      checkApiStatus()
     }
   }, [authed, activeView])
+
+  async function checkApiStatus() {
+    try {
+      const res = await fetchApi('/status')
+      if (res.ok) {
+        setApiStatus("online")
+      } else {
+        setApiStatus("error")
+      }
+    } catch {
+      setApiStatus("error")
+    }
+  }
 
   async function loadData() {
     try {
@@ -102,8 +117,10 @@ export function SystemAdminApp() {
           </div>
           <div className="flex items-center gap-4">
             <div className="hidden md:flex items-center gap-2">
-              <div className="size-2 rounded-full bg-blue-500 animate-pulse"></div>
-              <span className="text-xs font-medium text-slate-400">API Online</span>
+              <div className={`size-2 rounded-full ${apiStatus === 'online' ? 'bg-blue-500 animate-pulse' : apiStatus === 'error' ? 'bg-red-500' : 'bg-slate-500'}`}></div>
+              <span className="text-xs font-medium text-slate-400">
+                {apiStatus === 'online' ? 'API Online' : apiStatus === 'error' ? 'Ulaşılamıyor' : 'Bağlanıyor...'}
+              </span>
             </div>
             <div className="h-4 w-px bg-white/10 hidden md:block"></div>
             <div className="flex items-center gap-2 text-sm">

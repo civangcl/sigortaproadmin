@@ -32,6 +32,7 @@ model Company {
   phone     String?
   email     String?
   monthlyTarget Float? @default(100000)
+  isSystem  Boolean @default(false)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
